@@ -136,7 +136,7 @@ class SimVisitor(NodeVisitor):
             print(line)
 
     def generic_visit(self, node: AST) -> Any:
-        raise click.UsageError(
+        raise click.ClickException(
             "%s (%s): Unsupported python element: %s!"
             % (os.path.basename(self._filename), node.lineno, node)
         )
@@ -393,13 +393,13 @@ class SimVisitor(NodeVisitor):
         )
 
         if node.orelse:
-            raise click.UsageError(
+            raise click.ClickException(
                 "%s (%s): Unsupported for loop with 'else' statement!"
                 % (os.path.basename(self._filename), node.lineno)
             )
 
         if not (isinstance(node.iter, Call) and node.iter.func.id == "range"):
-            raise click.UsageError(
+            raise click.ClickException(
                 "%s (%s): Unsupported for loop with iterator not a range object!"
                 % (os.path.basename(self._filename), node.lineno)
             )
@@ -418,7 +418,7 @@ class SimVisitor(NodeVisitor):
             iter_stop = self.visit(node.iter.args[1])
             iter_step = self.visit(node.iter.args[2])
         else:
-            raise click.UsageError(
+            raise click.ClickException(
                 "%s (%s): Unsupported for loop with iterator and a range object with unknow arguments!"
                 % (os.path.basename(self._filename), node.lineno)
             )
