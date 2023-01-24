@@ -176,7 +176,9 @@ class SimVisitor(NodeVisitor):
         return "/"
 
     def visit_Constant(self, node: Constant) -> Any:
-        return node.value
+        return (
+            '"%s"' % node.value if isinstance(node.value, str) else node.value
+        )
 
     def visit_Eq(self, node: Eq) -> Any:
         return "=="
