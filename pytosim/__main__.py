@@ -20,6 +20,7 @@ from ast import (
     Expr,
     For,
     FunctionDef,
+    Global,
     Gt,
     GtE,
     If,
@@ -203,6 +204,10 @@ class SimVisitor(NodeVisitor):
             super().visit(node.ops[0]),
             super().visit(node.comparators[0]),
         )
+
+    def visit_Global(self, node: Global) -> Any:
+        for elem in node.names:
+            self._ctx.append_line("global %s" % elem)
 
     def visit_Pass(self, node: Pass) -> Any:
         # Silent ignores
