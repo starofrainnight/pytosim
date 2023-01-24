@@ -44,16 +44,9 @@ from ast import (
 )
 
 
-class SiMacroContextNode(object):
-    def __init__(self, ast_node: AST, parent) -> None:
-        self._ast_node = ast_node
-        self._parent = parent
-        self._children = []
-
-
-class SiMacroBlock(object):
+class SimBlock(object):
     def __init__(self) -> None:
-        self._parent: Union[SiMacroBlock, None] = None
+        self._parent: Union[SimBlock, None] = None
 
     @property
     def parent(self):
@@ -74,12 +67,12 @@ class SiMacroBlock(object):
         return cnt
 
 
-class SiMacroScope(SiMacroBlock):
+class SimScope(SimBlock):
     def __init__(self) -> None:
         super().__init__()
 
 
-class SiMacroContext(object):
+class SimContext(object):
     def __init__(self, parent=None) -> None:
         self._indent_symbol = " " * 4
         self._src_lines = []
@@ -97,7 +90,7 @@ class SiMacroContext(object):
     def get_indents(self) -> str:
         return self._indent_symbol * self._cur_block.get_indent_levels()
 
-    def enter_block(self, block: SiMacroBlock) -> None:
+    def enter_block(self, block: SimBlock) -> None:
         if self._cur_block is not None:
             block.parent = self._cur_block
 
@@ -128,11 +121,11 @@ class SiMacroContext(object):
         self._cur_line.clear()
 
 
-class SiMacroVisitor(NodeVisitor):
+class SimVisitor(NodeVisitor):
     def __init__(self) -> None:
         super().__init__()
 
-        self._ctx = SiMacroContext()
+        self._ctx = SimContext()
 
     def run(self, node: AST, filename=None) -> Any:
         self._filename = filename
@@ -240,8 +233,6 @@ class SiMacroVisitor(NodeVisitor):
         self._ctx.append_line("break")
 
     def visit_Assign(self, node: Assign) -> Any:
-        print("visit_Assign: %s, %s" % (node.targets, node.value))
-
         lop = node.targets[0]
         rop = node.value
 
@@ -262,16 +253,13 @@ class SiMacroVisitor(NodeVisitor):
                 self._ctx.pack_cur_line()
 
     def visit_Module(self, node: Module) -> Any:
-        print("visit_Module: %s" % node)
-
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         try:
             super().generic_visit(node)
         finally:
             self._ctx.leave_block()
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
-        print("visit_FunctionDef: %s" % node.name)
         self._ctx.pack_cur_line()
 
         # Parse function declaration with arguments
@@ -281,7 +269,7 @@ class SiMacroVisitor(NodeVisitor):
         self._ctx.append_cur_line("{")
         self._ctx.pack_cur_line()
 
-        self._ctx.enter_block(SiMacroScope())
+        self._ctx.enter_block(SimScope())
         try:
             # super().generic_visit(node)
             for stmt in node.body:
@@ -333,7 +321,7 @@ class SiMacroVisitor(NodeVisitor):
 
         self._ctx.append_cur_line("{")
         self._ctx.pack_cur_line()
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         for child in node.body:
             super().visit(child)
         self._ctx.leave_block()
@@ -352,7 +340,7 @@ class SiMacroVisitor(NodeVisitor):
                 self._ctx.append_cur_line("{")
                 self._ctx.pack_cur_line()
 
-                self._ctx.enter_block(SiMacroBlock())
+                self._ctx.enter_block(SimBlock())
                 for child in node.orelse:
                     super().visit(child)
                 self._ctx.leave_block()
@@ -363,11 +351,11 @@ class SiMacroVisitor(NodeVisitor):
     def visit_IfExp(self, node: IfExp) -> Any:
         var_name = self._ctx.gen_var()
         self._ctx.prepend_line("if (%s)" % self.visit(node.test))
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         self._ctx.prepend_line("%s = %s" % (var_name, self.visit(node.body)))
         self._ctx.leave_block()
         self._ctx.prepend_line("else")
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         self._ctx.prepend_line("%s = %s" % (var_name, self.visit(node.orelse)))
         self._ctx.leave_block()
         return var_name
@@ -381,7 +369,7 @@ class SiMacroVisitor(NodeVisitor):
         self._ctx.append_line("%s = %s" % (var_name, self.visit(node.test)))
         self._ctx.append_line("while (%s)" % var_name)
         self._ctx.append_line("{")
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         print(node.body)
         for child in node.body:
             super().visit(child)
@@ -391,7 +379,7 @@ class SiMacroVisitor(NodeVisitor):
         if node.orelse:
             self._ctx.append_line("if (!%s)" % var_name)
             self._ctx.append_line("{")
-            self._ctx.enter_block(SiMacroBlock())
+            self._ctx.enter_block(SimBlock())
             print(node.orelse)
             for child in node.orelse:
                 super().visit(child)
@@ -438,7 +426,7 @@ class SiMacroVisitor(NodeVisitor):
         self._ctx.append_line("%s = %s" % (var_name, iter_start))
         self._ctx.append_line("while (%s < %s)" % (var_name, iter_stop))
         self._ctx.append_line("{")
-        self._ctx.enter_block(SiMacroBlock())
+        self._ctx.enter_block(SimBlock())
         self._ctx.append_line(
             "%s = %s + (%s)" % (var_name, var_name, iter_step)
         )
@@ -455,7 +443,7 @@ def main(pyscript):
     out_path = Path(pyscript).with_suffix(".em")
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
-    visitor = SiMacroVisitor()
+    visitor = SimVisitor()
     visitor.run(root, pyscript)
 
 
