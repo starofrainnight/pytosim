@@ -92,7 +92,7 @@ class SiMacroContext(object):
         return self._elem_id
 
     def gen_var(self) -> str:
-        return "_pytosi_var%s" % self.gen_elem_id()
+        return "_pytosim_var%s" % self.gen_elem_id()
 
     def get_indents(self) -> str:
         return self._indent_symbol * self._cur_block.get_indent_levels()
