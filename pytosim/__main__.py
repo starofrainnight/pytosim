@@ -27,10 +27,12 @@ from ast import (
     IfExp,
     Import,
     ImportFrom,
+    JoinedStr,
     List,
     Load,
     Lt,
     LtE,
+    Mod,
     Module,
     Mult,
     NodeVisitor,
@@ -159,7 +161,17 @@ class SimVisitor(NodeVisitor):
     def visit_Store(self, node: Store) -> Any:
         return "="
 
+    def visit_Mod(self, node: Mod) -> Any:
+        return "%"
+
     def visit_BinOp(self, node: BinOp) -> Any:
+        if isinstance(node.op, Mod):
+            # Only support raw string format
+            raise click.ClickException(
+                "%s (%s): No support for Modulo operation!"
+                % (os.path.basename(self._filename), node.lineno)
+            )
+
         return "(%s %s %s)" % (
             super().visit(node.left),
             super().visit(node.op),
