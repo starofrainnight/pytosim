@@ -19,6 +19,7 @@ from ast import (
     Eq,
     Expr,
     For,
+    FormattedValue,
     FunctionDef,
     Global,
     Gt,
@@ -45,6 +46,7 @@ from ast import (
     arg,
     arguments,
 )
+from .util import str_quote, str_unquote
 
 
 class SimBlock(object):
@@ -219,6 +221,25 @@ class SimVisitor(NodeVisitor):
             super().visit(node.comparators[0]),
         )
 
+    def visit_FormattedValue(self, node: FormattedValue) -> Any:
+        return super().visit(node.value)
+
+    def visit_JoinedStr(self, node: JoinedStr) -> Any:
+        result = list()
+        for elem in node.values:
+            if isinstance(elem, FormattedValue):
+                value = super().visit(elem)
+                if value.isidentifier():
+                    result.append("%%%s%%" % value)
+                else:
+                    variable = self._ctx.gen_var()
+                    self._ctx.prepend_line("%s = %s" % (variable, value))
+                    result.append("%%%s%%" % variable)
+            else:
+                result.append(str_unquote(super().visit(elem)))
+
+        return str_quote("".join(result))
+
     def visit_Global(self, node: Global) -> Any:
         for elem in node.names:
             self._ctx.append_line("global %s" % elem)
@@ -241,7 +262,6 @@ class SimVisitor(NodeVisitor):
         self._ctx.pack_cur_line()
         self._ctx.append_cur_line("return ")
         if node.value:
-            # print("fuck : %s" % (self.visit(node.value),))
             self._ctx.append_cur_line(str(self.visit(node.value)))
         self._ctx.pack_cur_line()
 
