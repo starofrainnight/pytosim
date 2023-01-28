@@ -136,7 +136,6 @@ class SimVisitor(NodeVisitor):
         self._filename = filename
         self.visit(node)
 
-        print("Generated Source: ")
         for line in self._ctx._src_lines:
             print(line)
 
@@ -400,16 +399,12 @@ class SimVisitor(NodeVisitor):
         return var_name
 
     def visit_While(self, node: While) -> Any:
-        print(
-            "visit_While(): %s, %s, %s" % (node.test, node.body, node.orelse)
-        )
         var_name = self._ctx.gen_var()
 
         self._ctx.append_line("%s = %s" % (var_name, self.visit(node.test)))
         self._ctx.append_line("while (%s)" % var_name)
         self._ctx.append_line("{")
         self._ctx.enter_block(SimBlock())
-        print(node.body)
         for child in node.body:
             super().visit(child)
         self._ctx.leave_block()
@@ -419,18 +414,12 @@ class SimVisitor(NodeVisitor):
             self._ctx.append_line("if (!%s)" % var_name)
             self._ctx.append_line("{")
             self._ctx.enter_block(SimBlock())
-            print(node.orelse)
             for child in node.orelse:
                 super().visit(child)
             self._ctx.leave_block()
             self._ctx.append_line("}")
 
     def visit_For(self, node: For) -> Any:
-        print(
-            "visit_For: %s, %s, %s, %s"
-            % (node.target, node.iter, node.body, node.orelse)
-        )
-
         if node.orelse:
             raise click.ClickException(
                 "%s (%s): Unsupported for loop with 'else' statement!"
