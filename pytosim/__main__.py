@@ -209,11 +209,6 @@ class SimVisitor(NodeVisitor):
         return "<="
 
     def visit_Compare(self, node: Compare) -> Any:
-        print(
-            "visit_Compare(): %s, %s, %s"
-            % (node.left, node.ops, node.comparators)
-        )
-
         return "%s %s %s" % (
             super().visit(node.left),
             super().visit(node.ops[0]),
@@ -332,8 +327,6 @@ class SimVisitor(NodeVisitor):
         else:
             func_name = node.func.id
 
-        print("visit_Call: %s, %s, %s" % (node, func_name, node.args))
-
         texts = []
         texts.append(self.visit(node.func))
         texts.append("(")
@@ -352,8 +345,6 @@ class SimVisitor(NodeVisitor):
         return "".join(texts)
 
     def visit_If(self, node: If) -> Any:
-        print("visit_If(): %s, %s, %s" % (node.test, node.body, node.orelse))
-
         self._ctx.append_cur_line("if (%s)" % (self.visit(node.test),))
         self._ctx.pack_cur_line()
 
