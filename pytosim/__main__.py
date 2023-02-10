@@ -3,6 +3,7 @@ import os
 import os.path
 import click
 import weakref
+from collections import deque
 from typing import Any, Union
 from pathlib import Path
 from ast import (
@@ -61,16 +62,6 @@ class SimBlock(object):
     def parent(self, value):
         self._parent = value
 
-    def get_indent_levels(self):
-        block = self
-
-        cnt = -1
-        while block:
-            cnt = cnt + 1
-            block = block._parent
-
-        return cnt
-
 
 class SimScope(SimBlock):
     def __init__(self) -> None:
@@ -82,6 +73,7 @@ class SimContext(object):
         self._indent_symbol = " " * 4
         self._src_lines = []
         self._cur_block = None
+        self._block_stack = deque()
         self._cur_line = []
         self._elem_id = 0
 
@@ -92,21 +84,23 @@ class SimContext(object):
     def gen_var(self) -> str:
         return "_pytosim_var%s" % self.gen_elem_id()
 
+    def get_indent_levels(self):
+        cnt = len(self._block_stack)
+        if cnt <= 1:
+            cnt = 0
+        return cnt
+
     def get_indents(self) -> str:
-        return self._indent_symbol * self._cur_block.get_indent_levels()
+        return self._indent_symbol * self.get_indent_levels()
 
     def enter_block(self, block: SimBlock) -> None:
-        if self._cur_block is not None:
-            block.parent = self._cur_block
-
-        self._cur_block = block
+        self._block_stack.append(block)
 
     def leave_block(self) -> None:
         if self._cur_line:
             self.pack_cur_line()
 
-        if self._cur_block is not None:
-            self._cur_block = self._cur_block.parent
+        self._block_stack.pop()
 
     def prepend_line(self, text):
         self._src_lines.append(self.get_indents() + text)
