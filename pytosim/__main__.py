@@ -52,15 +52,7 @@ from .util import str_quote, str_unquote
 
 class SimBlock(object):
     def __init__(self) -> None:
-        self._parent: Union[SimBlock, None] = None
-
-    @property
-    def parent(self):
-        return self._parent
-
-    @parent.setter
-    def parent(self, value):
-        self._parent = value
+        pass
 
 
 class SimScope(SimBlock):
@@ -85,10 +77,7 @@ class SimContext(object):
         return "_pytosim_var%s" % self.gen_elem_id()
 
     def get_indent_levels(self):
-        cnt = len(self._block_stack)
-        if cnt <= 1:
-            cnt = 0
-        return cnt
+        return len(self._block_stack) - 1
 
     def get_indents(self) -> str:
         return self._indent_symbol * self.get_indent_levels()
