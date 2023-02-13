@@ -6,6 +6,7 @@ import weakref
 from collections import deque
 from typing import Any, Union
 from pathlib import Path
+from contextlib import contextmanager
 from ast import (
     AST,
     Add,
@@ -50,14 +51,17 @@ from ast import (
 from .util import str_quote, str_unquote
 
 
+class Variable(object):
+    def __init__(self) -> None:
+        self.name = ""
+
+
 class SimBlock(object):
-    def __init__(self) -> None:
-        pass
+    BLOCK = 0
+    SCOPE = 1
 
-
-class SimScope(SimBlock):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, atype=BLOCK) -> None:
+        self.type = atype
 
 
 class SimContext(object):
@@ -68,6 +72,18 @@ class SimContext(object):
         self._block_stack = deque()
         self._cur_line = []
         self._elem_id = 0
+
+    @contextmanager
+    def open_block(self, block_type=SimBlock.BLOCK):
+        try:
+            block = SimBlock(block_type)
+            self._block_stack.append(block)
+            yield block
+        finally:
+            if self._cur_line:
+                self.pack_cur_line()
+
+            self._block_stack.pop()
 
     def gen_elem_id(self) -> int:
         self._elem_id += 1
@@ -81,15 +97,6 @@ class SimContext(object):
 
     def get_indents(self) -> str:
         return self._indent_symbol * self.get_indent_levels()
-
-    def enter_block(self, block: SimBlock) -> None:
-        self._block_stack.append(block)
-
-    def leave_block(self) -> None:
-        if self._cur_line:
-            self.pack_cur_line()
-
-        self._block_stack.pop()
 
     def prepend_line(self, text):
         self._src_lines.append(self.get_indents() + text)
@@ -269,11 +276,8 @@ class SimVisitor(NodeVisitor):
                 self._ctx.pack_cur_line()
 
     def visit_Module(self, node: Module) -> Any:
-        self._ctx.enter_block(SimBlock())
-        try:
+        with self._ctx.open_block():
             super().generic_visit(node)
-        finally:
-            self._ctx.leave_block()
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         self._ctx.pack_cur_line()
@@ -285,13 +289,9 @@ class SimVisitor(NodeVisitor):
         self._ctx.append_cur_line("{")
         self._ctx.pack_cur_line()
 
-        self._ctx.enter_block(SimScope())
-        try:
-            # super().generic_visit(node)
+        with self._ctx.open_block(SimBlock.SCOPE):
             for stmt in node.body:
                 self.visit(stmt)
-        finally:
-            self._ctx.leave_block()
 
         self._ctx.append_cur_line("}")
         self._ctx.pack_cur_line()
@@ -333,10 +333,9 @@ class SimVisitor(NodeVisitor):
 
         self._ctx.append_cur_line("{")
         self._ctx.pack_cur_line()
-        self._ctx.enter_block(SimBlock())
-        for child in node.body:
-            super().visit(child)
-        self._ctx.leave_block()
+        with self._ctx.open_block():
+            for child in node.body:
+                super().visit(child)
         self._ctx.pack_cur_line()
         self._ctx.append_cur_line("}")
         self._ctx.pack_cur_line()
@@ -352,10 +351,9 @@ class SimVisitor(NodeVisitor):
                 self._ctx.append_cur_line("{")
                 self._ctx.pack_cur_line()
 
-                self._ctx.enter_block(SimBlock())
-                for child in node.orelse:
-                    super().visit(child)
-                self._ctx.leave_block()
+                with self._ctx.open_block():
+                    for child in node.orelse:
+                        super().visit(child)
 
                 self._ctx.append_cur_line("}")
                 self._ctx.pack_cur_line()
@@ -363,13 +361,15 @@ class SimVisitor(NodeVisitor):
     def visit_IfExp(self, node: IfExp) -> Any:
         var_name = self._ctx.gen_var()
         self._ctx.prepend_line("if (%s)" % self.visit(node.test))
-        self._ctx.enter_block(SimBlock())
-        self._ctx.prepend_line("%s = %s" % (var_name, self.visit(node.body)))
-        self._ctx.leave_block()
+        with self._ctx.open_block():
+            self._ctx.prepend_line(
+                "%s = %s" % (var_name, self.visit(node.body))
+            )
         self._ctx.prepend_line("else")
-        self._ctx.enter_block(SimBlock())
-        self._ctx.prepend_line("%s = %s" % (var_name, self.visit(node.orelse)))
-        self._ctx.leave_block()
+        with self._ctx.open_block():
+            self._ctx.prepend_line(
+                "%s = %s" % (var_name, self.visit(node.orelse))
+            )
         return var_name
 
     def visit_While(self, node: While) -> Any:
@@ -378,19 +378,17 @@ class SimVisitor(NodeVisitor):
         self._ctx.append_line("%s = %s" % (var_name, self.visit(node.test)))
         self._ctx.append_line("while (%s)" % var_name)
         self._ctx.append_line("{")
-        self._ctx.enter_block(SimBlock())
-        for child in node.body:
-            super().visit(child)
-        self._ctx.leave_block()
+        with self._ctx.open_block():
+            for child in node.body:
+                super().visit(child)
         self._ctx.append_line("}")
 
         if node.orelse:
             self._ctx.append_line("if (!%s)" % var_name)
             self._ctx.append_line("{")
-            self._ctx.enter_block(SimBlock())
-            for child in node.orelse:
-                super().visit(child)
-            self._ctx.leave_block()
+            with self._ctx.open_block():
+                for child in node.orelse:
+                    super().visit(child)
             self._ctx.append_line("}")
 
     def visit_For(self, node: For) -> Any:
@@ -428,13 +426,12 @@ class SimVisitor(NodeVisitor):
         self._ctx.append_line("%s = %s" % (var_name, iter_start))
         self._ctx.append_line("while (%s < %s)" % (var_name, iter_stop))
         self._ctx.append_line("{")
-        self._ctx.enter_block(SimBlock())
-        self._ctx.append_line(
-            "%s = %s + (%s)" % (var_name, var_name, iter_step)
-        )
-        for elem in node.body:
-            self.visit(elem)
-        self._ctx.leave_block()
+        with self._ctx.open_block():
+            self._ctx.append_line(
+                "%s = %s + (%s)" % (var_name, var_name, iter_step)
+            )
+            for elem in node.body:
+                self.visit(elem)
         self._ctx.append_line("}")
 
 
