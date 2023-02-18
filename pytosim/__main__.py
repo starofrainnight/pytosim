@@ -262,7 +262,7 @@ class SimVisitor(ast.NodeVisitor):
         if isinstance(node.op, ast.Mod):
             # Only support raw string format
             raise click.ClickException(
-                "%s (%s): No support for Modulo operation!"
+                "%s (%s): Unsupport modulo operation!"
                 % (os.path.basename(self._filename), node.lineno)
             )
 
