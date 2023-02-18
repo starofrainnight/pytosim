@@ -4,56 +4,39 @@ import os.path
 import click
 import weakref
 from collections import deque
-from typing import Any, Union
+from typing import Any, Union, List
 from pathlib import Path
 from contextlib import contextmanager
-from ast import (
-    AST,
-    Add,
-    Assign,
-    BinOp,
-    Break,
-    Call,
-    Compare,
-    Constant,
-    Continue,
-    Div,
-    Eq,
-    Expr,
-    For,
-    FormattedValue,
-    FunctionDef,
-    Global,
-    Gt,
-    GtE,
-    If,
-    IfExp,
-    Import,
-    ImportFrom,
-    JoinedStr,
-    List,
-    Load,
-    Lt,
-    LtE,
-    Mod,
-    Module,
-    Mult,
-    NodeVisitor,
-    Name,
-    Pass,
-    Return,
-    Store,
-    Tuple,
-    While,
-    arg,
-    arguments,
-)
 from .util import str_quote, str_unquote
 
 
+class NameError(click.ClickException):
+    def __init__(self, message: str, filename=None, node=None):
+        if node is not None:
+            message = '%s\n\nTraceback:\n  File "%s", line %s' % (
+                message,
+                filename,
+                node.lineno,
+            )
+
+        super().__init__(message)
+
+        self.node = node
+
+
+class VariableNotFoundError(click.ClickException):
+    pass
+
+
 class Variable(object):
-    def __init__(self) -> None:
-        self.name = ""
+    def __init__(self, name: str, value_type) -> None:
+        self.name = name
+        self.value_type = value_type
+
+
+class Module(object):
+    def __init__(self, nchain: List[str]) -> None:
+        self.nchain = nchain
 
 
 class SimBlock(object):
@@ -62,13 +45,14 @@ class SimBlock(object):
 
     def __init__(self, atype=BLOCK) -> None:
         self.type = atype
+        self.vars: List[Variable] = list()
+        self.imports: List[Union[ast.Import, ast.ImportFrom]] = list()
 
 
 class SimContext(object):
     def __init__(self, parent=None) -> None:
         self._indent_symbol = " " * 4
         self._src_lines = []
-        self._cur_block = None
         self._block_stack = deque()
         self._cur_line = []
         self._elem_id = 0
@@ -84,6 +68,13 @@ class SimContext(object):
                 self.pack_cur_line()
 
             self._block_stack.pop()
+
+    def get_last_scope(self) -> SimBlock:
+        for it in reversed(self._block_stack):
+            if it.type == SimBlock.SCOPE:
+                return it
+
+        raise IndexError()
 
     def gen_elem_id(self) -> int:
         self._elem_id += 1
@@ -116,47 +107,141 @@ class SimContext(object):
         self._cur_line.clear()
 
 
-class SimVisitor(NodeVisitor):
-    def __init__(self) -> None:
+class SimVisitor(ast.NodeVisitor):
+    def __init__(self, filename: str) -> None:
         super().__init__()
 
         self._ctx = SimContext()
+        self._filename = filename
 
-    def run(self, node: AST, filename=None) -> Any:
+    def run(self, node: ast.AST, filename=None) -> Any:
         self._filename = filename
         self.visit(node)
 
         for line in self._ctx._src_lines:
             print(line)
 
-    def generic_visit(self, node: AST) -> Any:
+    def get_name_chain(self, node) -> List[str]:
+        names = list()
+        while True:
+            if isinstance(node, ast.Attribute):
+                names.insert(0, node.attr)
+                node = node.value
+            else:
+                names.insert(0, node.id)
+                break
+
+        return names
+
+    def find_var(self, name):
+        for block in filter(
+            lambda it: it.type == SimBlock.SCOPE,
+            reversed(self._ctx._block_stack),
+        ):
+            for avar in block.vars:
+                # if avar in block.vars:
+                if avar.name == name:
+                    return avar
+
+        raise VariableNotFoundError(name)
+
+    def _get_nchain_from_call(self, node: ast.Call):
+        nchain = []
+        node = node.func
+        while node:
+            if isinstance(node, ast.Attribute):
+                nchain.append(node.attr)
+            else:
+                nchain.append(node.id)
+                break
+            node = node.value
+
+        return list(reversed(nchain))
+
+    def _get_module_nchain_from_import(
+        self, node: ast.Import, nchain: List[str]
+    ):
+        for analias in node.names:
+            if analias.asname:
+                if nchain[0] == analias.asname:
+                    return analias.name.split(".")
+                continue
+
+            # No alias
+            module_nchain = analias.name.split(".")
+            if len(module_nchain) < len(nchain):
+                continue
+
+            matched_nchain = nchain[: len(module_nchain)]
+            if module_nchain != matched_nchain:
+                continue
+
+            return module_nchain
+
+        raise NameError("name '%s' is not defined" % nchain[0])
+
+    def _get_module_nchain_from_import_from(
+        self, node: ast.ImportFrom, nchain: List[str]
+    ):
+        for analias in node.names:
+            if nchain[0] in [analias.asname or analias.name]:
+                return node.module.split(".")
+
+        raise NameError("name '%s' is not defined" % nchain[0])
+
+    def _get_module_nchain(self, nchain) -> List[str]:
+        for scope in self._ctx._block_stack:
+            if scope.type != SimBlock.SCOPE:
+                continue
+
+            for it in scope.imports:
+                if isinstance(it, ast.Import):
+                    try:
+                        return self._get_module_nchain_from_import(it, nchain)
+                    except NameError:
+                        pass
+
+                elif isinstance(it, ast.ImportFrom):
+                    try:
+                        return self._get_module_nchain_from_import_from(
+                            it, nchain
+                        )
+                    except NameError:
+                        pass
+
+        raise NameError("name '%s' is not defined" % nchain[0])
+
+    def validate_nchain(self, nchain) -> None:
+        self._get_module_nchain(nchain)
+
+    def generic_visit(self, node: ast.AST) -> Any:
         raise click.ClickException(
             "%s (%s): Unsupported python element: %s!"
             % (os.path.basename(self._filename), node.lineno, node)
         )
 
-    def visit_arguments(self, node: arguments):
+    def visit_arguments(self, node: ast.arguments) -> str:
         texts = []
         for arg in node.args:
             texts.append(arg.arg)
 
         return ", ".join(texts)
 
-    def visit_Tuple(self, node: Tuple) -> Any:
+    def visit_Tuple(self, node: ast.Tuple) -> Any:
         # Just silent ignored
         pass
 
-    def visit_Name(self, node: Name) -> Any:
+    def visit_Name(self, node: ast.Name) -> str:
         return node.id
 
-    def visit_Store(self, node: Store) -> Any:
+    def visit_Store(self, node: ast.Store) -> str:
         return "="
 
-    def visit_Mod(self, node: Mod) -> Any:
+    def visit_Mod(self, node: ast.Mod) -> str:
         return "%"
 
-    def visit_BinOp(self, node: BinOp) -> Any:
-        if isinstance(node.op, Mod):
+    def visit_BinOp(self, node: ast.BinOp) -> str:
+        if isinstance(node.op, ast.Mod):
             # Only support raw string format
             raise click.ClickException(
                 "%s (%s): No support for Modulo operation!"
@@ -169,49 +254,52 @@ class SimVisitor(NodeVisitor):
             super().visit(node.right),
         )
 
-    def visit_Add(self, node: Add) -> Any:
+    def visit_Add(self, node: ast.Add) -> str:
         return "+"
 
-    def visit_Mult(self, node: Mult) -> Any:
+    def visit_Mult(self, node: ast.Mult) -> str:
         return "*"
 
-    def visit_Div(self, node: Div) -> Any:
+    def visit_Div(self, node: ast.Div) -> str:
         return "/"
 
-    def visit_Constant(self, node: Constant) -> Any:
+    def visit_Constant(self, node: ast.Constant) -> str:
         return (
             '"%s"' % node.value if isinstance(node.value, str) else node.value
         )
 
-    def visit_Eq(self, node: Eq) -> Any:
+    def visit_Eq(self, node: ast.Eq) -> str:
         return "=="
 
-    def visit_Gt(self, node: Gt) -> Any:
+    def visit_Gt(self, node: ast.Gt) -> str:
         return ">"
 
-    def visit_GtE(self, node: GtE) -> Any:
+    def visit_GtE(self, node: ast.GtE) -> str:
         return ">="
 
-    def visit_Lt(self, node: Lt) -> Any:
+    def visit_Lt(self, node: ast.Lt) -> str:
         return "<"
 
-    def visit_LtE(self, node: LtE) -> Any:
+    def visit_LtE(self, node: ast.LtE) -> str:
         return "<="
 
-    def visit_Compare(self, node: Compare) -> Any:
+    def visit_Attribute(self, node: ast.Attribute) -> str:
+        return node.attr
+
+    def visit_Compare(self, node: ast.Compare) -> str:
         return "%s %s %s" % (
             super().visit(node.left),
             super().visit(node.ops[0]),
             super().visit(node.comparators[0]),
         )
 
-    def visit_FormattedValue(self, node: FormattedValue) -> Any:
+    def visit_FormattedValue(self, node: ast.FormattedValue) -> Any:
         return super().visit(node.value)
 
-    def visit_JoinedStr(self, node: JoinedStr) -> Any:
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> Any:
         result = list()
         for elem in node.values:
-            if isinstance(elem, FormattedValue):
+            if isinstance(elem, ast.FormattedValue):
                 value = super().visit(elem)
                 if value.isidentifier():
                     result.append("%%%s%%" % value)
@@ -224,42 +312,42 @@ class SimVisitor(NodeVisitor):
 
         return str_quote("".join(result))
 
-    def visit_Global(self, node: Global) -> Any:
+    def visit_Global(self, node: ast.Global) -> Any:
         for elem in node.names:
             self._ctx.append_line("global %s" % elem)
 
-    def visit_Pass(self, node: Pass) -> Any:
+    def visit_Pass(self, node: ast.Pass) -> Any:
         # Silent ignores
         pass
 
-    def visit_Load(self, node: Load) -> Any:
+    def visit_Load(self, node: ast.Load) -> Any:
         # Silent ignored
         pass
 
-    def visit_Expr(self, node: Expr) -> Any:
+    def visit_Expr(self, node: ast.Expr) -> Any:
         value = self.visit(node.value)
         if value:
             self._ctx.append_cur_line(str(value))
             self._ctx.pack_cur_line()
 
-    def visit_Return(self, node: Return) -> Any:
+    def visit_Return(self, node: ast.Return) -> Any:
         self._ctx.pack_cur_line()
         self._ctx.append_cur_line("return ")
         if node.value:
             self._ctx.append_cur_line(str(self.visit(node.value)))
         self._ctx.pack_cur_line()
 
-    def visit_Continue(self, node: Continue) -> Any:
+    def visit_Continue(self, node: ast.Continue) -> Any:
         self._ctx.append_line("continue")
 
-    def visit_Break(self, node: Break) -> Any:
+    def visit_Break(self, node: ast.Break) -> Any:
         self._ctx.append_line("break")
 
-    def visit_Assign(self, node: Assign) -> Any:
+    def visit_Assign(self, node: ast.Assign) -> Any:
         lop = node.targets[0]
         rop = node.value
 
-        if isinstance(lop, Name):
+        if isinstance(lop, ast.Name):
             self._ctx.pack_cur_line()
             self._ctx.append_cur_line(
                 "%s = %s" % (super().visit(lop), super().visit(rop))
@@ -275,11 +363,11 @@ class SimVisitor(NodeVisitor):
                 )
                 self._ctx.pack_cur_line()
 
-    def visit_Module(self, node: Module) -> Any:
-        with self._ctx.open_block():
+    def visit_Module(self, node: ast.Module) -> Any:
+        with self._ctx.open_block(SimBlock.SCOPE):
             super().generic_visit(node)
 
-    def visit_FunctionDef(self, node: FunctionDef) -> Any:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
         self._ctx.pack_cur_line()
 
         # Parse function declaration with arguments
@@ -296,19 +384,26 @@ class SimVisitor(NodeVisitor):
         self._ctx.append_cur_line("}")
         self._ctx.pack_cur_line()
 
-    def visit_ImportFrom(self, node: ImportFrom) -> Any:
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         # Ignore import keyword
-        pass
+        scope = self._ctx.get_last_scope()
+        scope.imports.append(node)
 
-    def visit_Import(self, node: Import) -> Any:
+    def visit_Import(self, node: ast.Import) -> Any:
         # Ignore import keyword
-        pass
+        scope = self._ctx.get_last_scope()
+        scope.imports.extend(node.names)
 
-    def visit_Call(self, node: Call) -> Any:
+    def visit_Call(self, node: ast.Call) -> Any:
         if isinstance(node.func, ast.Attribute):
             func_name = node.func.attr
         else:
             func_name = node.func.id
+
+        try:
+            self.validate_nchain(self._get_nchain_from_call(node))
+        except NameError as e:
+            raise NameError(e.message, self._filename, node)
 
         texts = []
         texts.append(self.visit(node.func))
@@ -327,7 +422,7 @@ class SimVisitor(NodeVisitor):
 
         return "".join(texts)
 
-    def visit_If(self, node: If) -> Any:
+    def visit_If(self, node: ast.If) -> Any:
         self._ctx.append_cur_line("if (%s)" % (self.visit(node.test),))
         self._ctx.pack_cur_line()
 
@@ -358,7 +453,7 @@ class SimVisitor(NodeVisitor):
                 self._ctx.append_cur_line("}")
                 self._ctx.pack_cur_line()
 
-    def visit_IfExp(self, node: IfExp) -> Any:
+    def visit_IfExp(self, node: ast.IfExp) -> Any:
         var_name = self._ctx.gen_var()
         self._ctx.prepend_line("if (%s)" % self.visit(node.test))
         with self._ctx.open_block():
@@ -372,7 +467,7 @@ class SimVisitor(NodeVisitor):
             )
         return var_name
 
-    def visit_While(self, node: While) -> Any:
+    def visit_While(self, node: ast.While) -> Any:
         var_name = self._ctx.gen_var()
 
         self._ctx.append_line("%s = %s" % (var_name, self.visit(node.test)))
@@ -391,14 +486,16 @@ class SimVisitor(NodeVisitor):
                     super().visit(child)
             self._ctx.append_line("}")
 
-    def visit_For(self, node: For) -> Any:
+    def visit_For(self, node: ast.For) -> Any:
         if node.orelse:
             raise click.ClickException(
                 "%s (%s): Unsupported for loop with 'else' statement!"
                 % (os.path.basename(self._filename), node.lineno)
             )
 
-        if not (isinstance(node.iter, Call) and node.iter.func.id == "range"):
+        if not (
+            isinstance(node.iter, ast.Call) and node.iter.func.id == "range"
+        ):
             raise click.ClickException(
                 "%s (%s): Unsupported for loop with iterator not a range object!"
                 % (os.path.basename(self._filename), node.lineno)
@@ -442,7 +539,7 @@ def main(pyscript):
     out_path = Path(pyscript).with_suffix(".em")
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
-    visitor = SimVisitor()
+    visitor = SimVisitor(pyscript)
     visitor.run(root, pyscript)
 
 
