@@ -39,6 +39,18 @@ class Module(object):
         self.nchain = nchain
 
 
+class SimNChain(object):
+    def __init__(
+        self, source: List[str], module: List[str], children: List[str]
+    ) -> None:
+        self.module = module
+        self.children = children
+        self.source = source
+
+    def resolve(self):
+        return self.module + self.children
+
+
 class SimBlock(object):
     BLOCK = 0
     SCOPE = 1
@@ -158,13 +170,14 @@ class SimVisitor(ast.NodeVisitor):
 
         return list(reversed(nchain))
 
-    def _get_module_nchain_from_import(
+    def _resolve_nchain_from_import(
         self, node: ast.Import, nchain: List[str]
-    ):
+    ) -> SimNChain:
         for analias in node.names:
             if analias.asname:
                 if nchain[0] == analias.asname:
-                    return analias.name.split(".")
+                    module_nchain = analias.name.split(".")
+                    return SimNChain(nchain, module_nchain, nchain[1:])
                 continue
 
             # No alias
@@ -176,20 +189,24 @@ class SimVisitor(ast.NodeVisitor):
             if module_nchain != matched_nchain:
                 continue
 
-            return module_nchain
+            return SimNChain(
+                nchain, module_nchain, nchain[len(module_nchain) - 1 :]
+            )
 
         raise NameError("name '%s' is not defined" % nchain[0])
 
-    def _get_module_nchain_from_import_from(
+    def _resolve_nchain_from_import_from(
         self, node: ast.ImportFrom, nchain: List[str]
     ):
         for analias in node.names:
             if nchain[0] in [analias.asname or analias.name]:
-                return node.module.split(".")
+                return SimNChain(
+                    nchain, node.module.split("."), [analias.name]
+                )
 
         raise NameError("name '%s' is not defined" % nchain[0])
 
-    def _get_module_nchain(self, nchain) -> List[str]:
+    def _resolve_nchain(self, nchain) -> SimNChain:
         for scope in self._ctx._block_stack:
             if scope.type != SimBlock.SCOPE:
                 continue
@@ -197,22 +214,19 @@ class SimVisitor(ast.NodeVisitor):
             for it in scope.imports:
                 if isinstance(it, ast.Import):
                     try:
-                        return self._get_module_nchain_from_import(it, nchain)
+                        return self._resolve_nchain_from_import(it, nchain)
                     except NameError:
                         pass
 
                 elif isinstance(it, ast.ImportFrom):
                     try:
-                        return self._get_module_nchain_from_import_from(
+                        return self._resolve_nchain_from_import_from(
                             it, nchain
                         )
                     except NameError:
                         pass
 
         raise NameError("name '%s' is not defined" % nchain[0])
-
-    def validate_nchain(self, nchain) -> None:
-        self._get_module_nchain(nchain)
 
     def generic_visit(self, node: ast.AST) -> Any:
         raise click.ClickException(
@@ -401,12 +415,20 @@ class SimVisitor(ast.NodeVisitor):
             func_name = node.func.id
 
         try:
-            self.validate_nchain(self._get_nchain_from_call(node))
+            nchain = self._resolve_nchain(self._get_nchain_from_call(node))
         except NameError as e:
             raise NameError(e.message, self._filename, node)
 
         texts = []
         texts.append(self.visit(node.func))
+
+        # Support special pytosim.api.cmds convertion
+        cmds_api_nchain = ["pytosim", "api", "cmds"]
+        if (len(nchain.module) >= len(cmds_api_nchain)) and (
+            nchain.module[: len(cmds_api_nchain)] == cmds_api_nchain
+        ):
+            return nchain.children[0]
+
         texts.append("(")
 
         arg_texts = []
