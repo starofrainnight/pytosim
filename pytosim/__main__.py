@@ -28,13 +28,13 @@ class VariableNotFoundError(click.ClickException):
     pass
 
 
-class Variable(object):
+class SimVariable(object):
     def __init__(self, name: str, value_type) -> None:
         self.name = name
         self.value_type = value_type
 
 
-class Module(object):
+class SimModule(object):
     def __init__(self, nchain: List[str]) -> None:
         self.nchain = nchain
 
@@ -57,7 +57,7 @@ class SimBlock(object):
 
     def __init__(self, atype=BLOCK) -> None:
         self.type = atype
-        self.vars: List[Variable] = list()
+        self.vars: List[SimVariable] = list()
         self.imports: List[Union[ast.Import, ast.ImportFrom]] = list()
 
 
@@ -211,6 +211,10 @@ class SimVisitor(ast.NodeVisitor):
             if scope.type != SimBlock.SCOPE:
                 continue
 
+            for it in scope.vars:
+                if nchain[0] == it.name:
+                    return SimNChain(nchain, ["."], nchain)
+
             for it in scope.imports:
                 if isinstance(it, ast.Import):
                     try:
@@ -363,19 +367,23 @@ class SimVisitor(ast.NodeVisitor):
 
         if isinstance(lop, ast.Name):
             self._ctx.pack_cur_line()
-            self._ctx.append_cur_line(
-                "%s = %s" % (super().visit(lop), super().visit(rop))
-            )
+            lname = super().visit(lop)
+            rname = super().visit(rop)
+            self._ctx.append_cur_line("%s = %s" % (lname, rname))
             self._ctx.pack_cur_line()
+
+            scope = self._ctx.get_last_scope()
+            scope.vars.append(SimVariable(lname, ""))
         else:
             # Assume rop as Tuple
             self._ctx.pack_cur_line()
             for name_node, value_node in zip(lop.elts, rop.elts):
-                self._ctx.append_cur_line(
-                    "%s = %s"
-                    % (super().visit(name_node), super().visit(value_node))
-                )
+                lname = super().visit(name_node)
+                rname = super().visit(value_node)
+                self._ctx.append_cur_line("%s = %s" % (lname, rname))
                 self._ctx.pack_cur_line()
+                scope = self._ctx.get_last_scope()
+                scope.vars.append(SimVariable(lname, ""))
 
     def visit_Module(self, node: ast.Module) -> Any:
         with self._ctx.open_block(SimBlock.SCOPE):
