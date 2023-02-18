@@ -414,7 +414,7 @@ class SimVisitor(ast.NodeVisitor):
     def visit_Import(self, node: ast.Import) -> Any:
         # Ignore import keyword
         scope = self._ctx.get_last_scope()
-        scope.imports.extend(node.names)
+        scope.imports.append(node)
 
     def visit_Call(self, node: ast.Call) -> Any:
         if isinstance(node.func, ast.Attribute):
@@ -427,9 +427,6 @@ class SimVisitor(ast.NodeVisitor):
         except NameError as e:
             raise NameError(e.message, self._filename, node)
 
-        texts = []
-        texts.append(self.visit(node.func))
-
         # Support special pytosim.api.cmds convertion
         cmds_api_nchain = ["pytosim", "api", "cmds"]
         if (len(nchain.module) >= len(cmds_api_nchain)) and (
@@ -437,6 +434,8 @@ class SimVisitor(ast.NodeVisitor):
         ):
             return nchain.children[0]
 
+        texts = []
+        texts.append(nchain.children[-1])
         texts.append("(")
 
         arg_texts = []
