@@ -28,6 +28,15 @@ class VariableNotFoundError(click.ClickException):
     pass
 
 
+class VisitResult(object):
+    def __init__(self, text: str, value_type=str):
+        self.text = text
+        self.value_type = value_type
+
+    def __str__(self):
+        return self.text
+
+
 class SimVariable(object):
     def __init__(self, name: str, value_type) -> None:
         self.name = name
@@ -238,27 +247,27 @@ class SimVisitor(ast.NodeVisitor):
             % (os.path.basename(self._filename), node.lineno, node)
         )
 
-    def visit_arguments(self, node: ast.arguments) -> str:
+    def visit_arguments(self, node: ast.arguments) -> VisitResult:
         texts = []
         for arg in node.args:
             texts.append(arg.arg)
 
-        return ", ".join(texts)
+        return VisitResult(", ".join(texts))
 
     def visit_Tuple(self, node: ast.Tuple) -> Any:
         # Just silent ignored
         pass
 
-    def visit_Name(self, node: ast.Name) -> str:
-        return node.id
+    def visit_Name(self, node: ast.Name) -> VisitResult:
+        return VisitResult(node.id)
 
-    def visit_Store(self, node: ast.Store) -> str:
-        return "="
+    def visit_Store(self, node: ast.Store) -> VisitResult:
+        return VisitResult("=")
 
-    def visit_Mod(self, node: ast.Mod) -> str:
-        return "%"
+    def visit_Mod(self, node: ast.Mod) -> VisitResult:
+        return VisitResult("%")
 
-    def visit_BinOp(self, node: ast.BinOp) -> str:
+    def visit_BinOp(self, node: ast.BinOp) -> VisitResult:
         if isinstance(node.op, ast.Mod):
             # Only support raw string format
             raise click.ClickException(
@@ -266,55 +275,64 @@ class SimVisitor(ast.NodeVisitor):
                 % (os.path.basename(self._filename), node.lineno)
             )
 
-        return "(%s %s %s)" % (
-            super().visit(node.left),
-            super().visit(node.op),
-            super().visit(node.right),
+        return VisitResult(
+            "(%s %s %s)"
+            % (
+                super().visit(node.left),
+                super().visit(node.op),
+                super().visit(node.right),
+            )
         )
 
     def visit_Add(self, node: ast.Add) -> str:
-        return "+"
+        return VisitResult("+")
 
     def visit_Mult(self, node: ast.Mult) -> str:
-        return "*"
+        return VisitResult("*")
 
     def visit_Div(self, node: ast.Div) -> str:
-        return "/"
+        return VisitResult("/")
 
     def visit_Constant(self, node: ast.Constant) -> str:
-        return (
-            '"%s"' % node.value if isinstance(node.value, str) else node.value
+        return VisitResult(
+            ('"%s"' % node.value)
+            if isinstance(node.value, str)
+            else str(node.value),
+            type(node.value),
         )
 
     def visit_Eq(self, node: ast.Eq) -> str:
-        return "=="
+        return VisitResult("==")
 
     def visit_Gt(self, node: ast.Gt) -> str:
-        return ">"
+        return VisitResult(">")
 
     def visit_GtE(self, node: ast.GtE) -> str:
-        return ">="
+        return VisitResult(">=")
 
     def visit_Lt(self, node: ast.Lt) -> str:
-        return "<"
+        return VisitResult("<")
 
     def visit_LtE(self, node: ast.LtE) -> str:
-        return "<="
+        return VisitResult("<=")
 
     def visit_Attribute(self, node: ast.Attribute) -> str:
-        return node.attr
+        return VisitResult(node.attr)
 
     def visit_Compare(self, node: ast.Compare) -> str:
-        return "%s %s %s" % (
-            super().visit(node.left),
-            super().visit(node.ops[0]),
-            super().visit(node.comparators[0]),
+        return VisitResult(
+            "%s %s %s"
+            % (
+                super().visit(node.left),
+                super().visit(node.ops[0]),
+                super().visit(node.comparators[0]),
+            )
         )
 
-    def visit_FormattedValue(self, node: ast.FormattedValue) -> Any:
-        return super().visit(node.value)
+    def visit_FormattedValue(self, node: ast.FormattedValue) -> VisitResult:
+        return VisitResult(super().visit(node.value))
 
-    def visit_JoinedStr(self, node: ast.JoinedStr) -> Any:
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> VisitResult:
         result = list()
         for elem in node.values:
             if isinstance(elem, ast.FormattedValue):
@@ -328,7 +346,7 @@ class SimVisitor(ast.NodeVisitor):
             else:
                 result.append(str_unquote(super().visit(elem)))
 
-        return str_quote("".join(result))
+        return VisitResult(str_quote("".join(result)))
 
     def visit_Global(self, node: ast.Global) -> Any:
         for elem in node.names:
