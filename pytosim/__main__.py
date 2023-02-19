@@ -330,21 +330,21 @@ class SimVisitor(ast.NodeVisitor):
         )
 
     def visit_FormattedValue(self, node: ast.FormattedValue) -> VisitResult:
-        return VisitResult(super().visit(node.value))
+        return VisitResult(super().visit(node.value).text)
 
     def visit_JoinedStr(self, node: ast.JoinedStr) -> VisitResult:
         result = list()
         for elem in node.values:
             if isinstance(elem, ast.FormattedValue):
                 value = super().visit(elem)
-                if value.isidentifier():
+                if value.text.isidentifier():
                     result.append("%%%s%%" % value)
                 else:
                     variable = self._ctx.gen_var()
                     self._ctx.prepend_line("%s = %s" % (variable, value))
                     result.append("%%%s%%" % variable)
             else:
-                result.append(str_unquote(super().visit(elem)))
+                result.append(str_unquote(str(super().visit(elem))))
 
         return VisitResult(str_quote("".join(result)))
 
