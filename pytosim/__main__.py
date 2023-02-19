@@ -338,11 +338,11 @@ class SimVisitor(ast.NodeVisitor):
             if isinstance(elem, ast.FormattedValue):
                 value = super().visit(elem)
                 if value.text.isidentifier():
-                    result.append("%%%s%%" % value)
+                    result.append("@%s@" % value)
                 else:
                     variable = self._ctx.gen_var()
                     self._ctx.prepend_line("%s = %s" % (variable, value))
-                    result.append("%%%s%%" % variable)
+                    result.append("@%s@" % variable)
             else:
                 result.append(str_unquote(str(super().visit(elem))))
 
