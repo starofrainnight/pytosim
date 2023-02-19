@@ -4,13 +4,13 @@ import os.path
 import click
 import weakref
 from collections import deque
-from typing import Any, Union, List
+from typing import Any, Union, List, Deque
 from pathlib import Path
 from contextlib import contextmanager
 from .util import str_quote, str_unquote
 
 
-class NameError(click.ClickException):
+class VisitorError(click.ClickException):
     def __init__(self, message: str, filename=None, node=None):
         if node is not None:
             message = '%s\n\nTraceback:\n  File "%s", line %s' % (
@@ -22,6 +22,10 @@ class NameError(click.ClickException):
         super().__init__(message)
 
         self.node = node
+
+
+class NameError(click.ClickException):
+    pass
 
 
 class VariableNotFoundError(click.ClickException):
@@ -37,13 +41,23 @@ class VisitResult(object):
         return self.text
 
 
-class SimVariable(object):
-    def __init__(self, name: str, value_type) -> None:
+class SimElement(object):
+    pass
+
+
+class SimFunction(SimElement):
+    def __init__(self, name: str, node: ast.FunctionDef) -> None:
+        self.name = name
+        self.node = node
+
+
+class SimVariable(SimElement):
+    def __init__(self, name: str, value_type=str) -> None:
         self.name = name
         self.value_type = value_type
 
 
-class SimModule(object):
+class SimModule(SimElement):
     def __init__(self, nchain: List[str]) -> None:
         self.nchain = nchain
 
@@ -67,6 +81,7 @@ class SimBlock(object):
     def __init__(self, atype=BLOCK) -> None:
         self.type = atype
         self.vars: List[SimVariable] = list()
+        self.funcs: List[SimFunction] = list()
         self.imports: List[Union[ast.Import, ast.ImportFrom]] = list()
 
 
@@ -74,7 +89,7 @@ class SimContext(object):
     def __init__(self, parent=None) -> None:
         self._indent_symbol = " " * 4
         self._src_lines = []
-        self._block_stack = deque()
+        self._block_stack = deque()  # type: Deque[SimBlock]
         self._cur_line = []
         self._elem_id = 0
 
@@ -224,6 +239,10 @@ class SimVisitor(ast.NodeVisitor):
                 if nchain[0] == it.name:
                     return SimNChain(nchain, ["."], nchain)
 
+            for it in scope.funcs:
+                if nchain[0] == it.name:
+                    return SimNChain(nchain, ["."], nchain)
+
             for it in scope.imports:
                 if isinstance(it, ast.Import):
                     try:
@@ -275,14 +294,11 @@ class SimVisitor(ast.NodeVisitor):
                 % (os.path.basename(self._filename), node.lineno)
             )
 
-        return VisitResult(
-            "(%s %s %s)"
-            % (
-                super().visit(node.left),
-                super().visit(node.op),
-                super().visit(node.right),
-            )
-        )
+        lvalue = super().visit(node.left)
+        opvalue = super().visit(node.op)
+        rvalue = super().visit(node.right)
+
+        return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue))
 
     def visit_Add(self, node: ast.Add) -> str:
         return VisitResult("+")
@@ -393,7 +409,7 @@ class SimVisitor(ast.NodeVisitor):
             self._ctx.pack_cur_line()
 
             scope = self._ctx.get_last_scope()
-            scope.vars.append(SimVariable(lname, ""))
+            scope.vars.append(SimVariable(lname))
         else:
             # Assume rop as Tuple
             self._ctx.pack_cur_line()
@@ -403,7 +419,7 @@ class SimVisitor(ast.NodeVisitor):
                 self._ctx.append_cur_line("%s = %s" % (lname, rname))
                 self._ctx.pack_cur_line()
                 scope = self._ctx.get_last_scope()
-                scope.vars.append(SimVariable(lname, ""))
+                scope.vars.append(SimVariable(lname))
 
     def visit_Module(self, node: ast.Module) -> Any:
         with self._ctx.open_block(SimBlock.SCOPE):
@@ -425,6 +441,18 @@ class SimVisitor(ast.NodeVisitor):
 
         self._ctx.append_cur_line("}")
         self._ctx.pack_cur_line()
+
+        # Only supports module area function definition
+        last_scope = self._ctx.get_last_scope()
+        first_scope = self._ctx._block_stack[0]
+        if last_scope != first_scope:
+            raise VisitorError(
+                "Function definition only allowed in module level!",
+                self._filename,
+                node,
+            )
+
+        first_scope.funcs.append(SimFunction(node.name, node))
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         # Ignore import keyword
