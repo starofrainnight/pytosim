@@ -344,7 +344,9 @@ class SimVisitor(ast.NodeVisitor):
                     self._ctx.prepend_line("%s = %s" % (variable, value))
                     result.append("@%s@" % variable)
             else:
-                result.append(str_unquote(str(super().visit(elem))))
+                value = str_unquote(str(super().visit(elem)))
+                value = value.replace("@", r"\@")
+                result.append(value)
 
         return VisitResult(str_quote("".join(result)))
 
