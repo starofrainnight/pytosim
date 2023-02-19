@@ -124,7 +124,17 @@ class SYSTIME:
 
 
 # Source Insight handle type
-HBuffer = int
-HWnd = int
-HSymbol = int
-HProj = int
+class HBuffer(object):
+    pass
+
+
+class HWnd(object):
+    pass
+
+
+class HSymbol(object):
+    pass
+
+
+class HProj(object):
+    pass
