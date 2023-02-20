@@ -149,6 +149,7 @@ class SimVisitor(ast.NodeVisitor):
 
         self._ctx = SimContext()
         self._filename = filename
+        self._buildins = ["ord", "chr"]
 
     def run(self, node: ast.AST, filename=None) -> Any:
         self._filename = filename
@@ -193,6 +194,9 @@ class SimVisitor(ast.NodeVisitor):
             node = node.value
 
         return list(reversed(nchain))
+
+    def _is_buildin_nchain(self, nchain) -> bool:
+        return (len(nchain) == 1) and (nchain[0] in self._buildins)
 
     def _resolve_nchain_from_import(
         self, node: ast.Import, nchain: List[str]
@@ -464,26 +468,46 @@ class SimVisitor(ast.NodeVisitor):
         scope = self._ctx.get_last_scope()
         scope.imports.append(node)
 
+    def visit_BuildIns(self, node: ast.Call) -> Any:
+        nchain = self._get_nchain_from_call(node)
+        var_name = nchain[-1]
+        replaced_name = ""
+        if var_name == "chr":
+            replaced_name = "CharFromAscii"
+        elif var_name == "ord":
+            replaced_name = "AsciiFromChar"
+
+        return VisitResult(replaced_name)
+
     def visit_Call(self, node: ast.Call) -> Any:
         if isinstance(node.func, ast.Attribute):
             func_name = node.func.attr
         else:
             func_name = node.func.id
 
+        nchain = self._get_nchain_from_call(node)
+        is_buildin = False
         try:
-            nchain = self._resolve_nchain(self._get_nchain_from_call(node))
+            nchain = self._resolve_nchain(nchain)
         except NameError as e:
-            raise NameError(e.message, self._filename, node)
+            is_buildin = self._is_buildin_nchain(nchain)
+            if not is_buildin:
+                raise NameError(e.message, self._filename, node)
 
-        # Support special pytosim.api.cmds convertion
-        cmds_api_nchain = ["pytosim", "api", "cmds"]
-        if (len(nchain.module) >= len(cmds_api_nchain)) and (
-            nchain.module[: len(cmds_api_nchain)] == cmds_api_nchain
-        ):
-            return nchain.children[0]
+        if is_buildin:
+            mapped_func_name = self.visit_BuildIns(node).text
+        else:
+            # Support special pytosim.api.cmds convertion
+            cmds_api_nchain = ["pytosim", "api", "cmds"]
+            if (len(nchain.module) >= len(cmds_api_nchain)) and (
+                nchain.module[: len(cmds_api_nchain)] == cmds_api_nchain
+            ):
+                return nchain.children[0]
+
+            mapped_func_name = nchain.children[-1]
 
         texts = []
-        texts.append(nchain.children[-1])
+        texts.append(mapped_func_name)
         texts.append("(")
 
         arg_texts = []
