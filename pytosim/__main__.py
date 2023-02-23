@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 import ast
 import os
 import os.path
 import click
 import weakref
 from collections import deque
-from typing import Any, Union, List, Deque
+from typing import Any, Union, List, Deque, Callable
 from pathlib import Path
 from contextlib import contextmanager
 from .util import str_quote, str_unquote
@@ -33,8 +34,9 @@ class VariableNotFoundError(VisitorError):
 
 
 class VisitResult(object):
-    def __init__(self, text: str, value_type=str):
+    def __init__(self, text: str, node, value_type=str):
         self.text = text
+        self.node = node
         self.value_type = value_type
 
     def __str__(self):
@@ -149,7 +151,7 @@ class SimVisitor(ast.NodeVisitor):
 
         self._ctx = SimContext()
         self._filename = filename
-        self._buildins = ["ord", "chr"]
+        self._buildins = ["ord", "chr", "len"]
 
     def run(self, node: ast.AST, filename=None) -> Any:
         self._filename = filename
@@ -275,20 +277,20 @@ class SimVisitor(ast.NodeVisitor):
         for arg in node.args:
             texts.append(arg.arg)
 
-        return VisitResult(", ".join(texts))
+        return VisitResult(", ".join(texts), node)
 
     def visit_Tuple(self, node: ast.Tuple) -> Any:
         # Just silent ignored
         pass
 
     def visit_Name(self, node: ast.Name) -> VisitResult:
-        return VisitResult(node.id)
+        return VisitResult(node.id, node)
 
     def visit_Store(self, node: ast.Store) -> VisitResult:
-        return VisitResult("=")
+        return VisitResult("=", node)
 
     def visit_Mod(self, node: ast.Mod) -> VisitResult:
-        return VisitResult("%")
+        return VisitResult("%", node)
 
     def visit_BinOp(self, node: ast.BinOp) -> VisitResult:
         if isinstance(node.op, ast.Mod):
@@ -302,42 +304,43 @@ class SimVisitor(ast.NodeVisitor):
         opvalue = super().visit(node.op)
         rvalue = super().visit(node.right)
 
-        return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue))
+        return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue), node)
 
     def visit_Add(self, node: ast.Add) -> str:
-        return VisitResult("+")
+        return VisitResult("+", node)
 
     def visit_Mult(self, node: ast.Mult) -> str:
-        return VisitResult("*")
+        return VisitResult("*", node)
 
     def visit_Div(self, node: ast.Div) -> str:
-        return VisitResult("/")
+        return VisitResult("/", node)
 
     def visit_Constant(self, node: ast.Constant) -> str:
         return VisitResult(
             ('"%s"' % node.value)
             if isinstance(node.value, str)
             else str(node.value),
+            node,
             type(node.value),
         )
 
     def visit_Eq(self, node: ast.Eq) -> str:
-        return VisitResult("==")
+        return VisitResult("==", node)
 
     def visit_Gt(self, node: ast.Gt) -> str:
-        return VisitResult(">")
+        return VisitResult(">", node)
 
     def visit_GtE(self, node: ast.GtE) -> str:
-        return VisitResult(">=")
+        return VisitResult(">=", node)
 
     def visit_Lt(self, node: ast.Lt) -> str:
-        return VisitResult("<")
+        return VisitResult("<", node)
 
     def visit_LtE(self, node: ast.LtE) -> str:
-        return VisitResult("<=")
+        return VisitResult("<=", node)
 
     def visit_Attribute(self, node: ast.Attribute) -> str:
-        return VisitResult(node.attr)
+        return VisitResult(node.attr, node)
 
     def visit_Compare(self, node: ast.Compare) -> str:
         return VisitResult(
@@ -346,11 +349,12 @@ class SimVisitor(ast.NodeVisitor):
                 super().visit(node.left),
                 super().visit(node.ops[0]),
                 super().visit(node.comparators[0]),
-            )
+            ),
+            node,
         )
 
     def visit_FormattedValue(self, node: ast.FormattedValue) -> VisitResult:
-        return VisitResult(super().visit(node.value).text)
+        return VisitResult(super().visit(node.value).text, node)
 
     def visit_JoinedStr(self, node: ast.JoinedStr) -> VisitResult:
         result = list()
@@ -368,7 +372,7 @@ class SimVisitor(ast.NodeVisitor):
                 value = value.replace("@", r"\@")
                 result.append(value)
 
-        return VisitResult(str_quote("".join(result)))
+        return VisitResult(str_quote("".join(result)), node)
 
     def visit_Global(self, node: ast.Global) -> Any:
         for elem in node.names:
@@ -476,8 +480,10 @@ class SimVisitor(ast.NodeVisitor):
             replaced_name = "CharFromAscii"
         elif var_name == "ord":
             replaced_name = "AsciiFromChar"
+        elif var_name == "len":
+            replaced_name = "strlen"
 
-        return VisitResult(replaced_name)
+        return VisitResult(replaced_name, Any)
 
     def visit_Call(self, node: ast.Call) -> Any:
         if isinstance(node.func, ast.Attribute):
@@ -513,15 +519,20 @@ class SimVisitor(ast.NodeVisitor):
         arg_texts = []
         for arg in node.args:
             value = self.visit(arg)
-            if isinstance(value, str):
+            print("value : %s" % value)
+            if isinstance(value.node, ast.Constant) and (
+                value.value_type == str
+            ):
+                print("value1 : %s" % value)
                 arg_texts.append('"%s"' % value)
             else:
+                print("value2 : %s" % value)
                 arg_texts.append(str(value))
 
         texts.append(", ".join(arg_texts))
         texts.append(")")
 
-        return "".join(texts)
+        return VisitResult("".join(texts), node, value_type=Callable)
 
     def visit_If(self, node: ast.If) -> Any:
         self._ctx.append_cur_line("if (%s)" % (self.visit(node.test),))
@@ -633,9 +644,28 @@ class SimVisitor(ast.NodeVisitor):
         self._ctx.append_line("}")
 
 
-@click.command()
+@click.group()
+def main():
+    pass
+
+
+@main.command()
+def compile_base():
+    """Generate the pytosim base macro file"""
+
+    pyscript = os.path.join(
+        os.path.dirname(__file__), "data", "pytosimbase.py"
+    )
+    out_path = Path(pyscript).with_suffix(".em")
+    with open(pyscript, "r") as f:
+        root = ast.parse(f.read(), filename=pyscript)
+    visitor = SimVisitor(pyscript)
+    visitor.run(root, pyscript)
+
+
+@main.command()
 @click.argument("pyscript")
-def main(pyscript):
+def compile(pyscript):
     """A compiler for convert Python source to Source Insight 3.5 Macro"""
     out_path = Path(pyscript).with_suffix(".em")
     with open(pyscript, "r") as f:
