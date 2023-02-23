@@ -24,11 +24,11 @@ class VisitorError(click.ClickException):
         self.node = node
 
 
-class NameError(click.ClickException):
+class NameError(VisitorError):
     pass
 
 
-class VariableNotFoundError(click.ClickException):
+class VariableNotFoundError(VisitorError):
     pass
 
 
