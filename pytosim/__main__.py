@@ -552,7 +552,7 @@ class SimVisitor(ast.NodeVisitor):
         self._ctx.pack_cur_line()
 
         if len(node.orelse):
-            if (len(node.orelse) == 1) and isinstance(node.orelse[0], If):
+            if (len(node.orelse) == 1) and isinstance(node.orelse[0], ast.If):
                 self._ctx.append_cur_line("else ")
                 super().visit(node.orelse[0])
             else:
