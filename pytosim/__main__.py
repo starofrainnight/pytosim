@@ -299,16 +299,26 @@ class SimVisitor(ast.NodeVisitor):
         return VisitResult("%", node)
 
     def visit_BinOp(self, node: ast.BinOp) -> VisitResult:
-        if isinstance(node.op, ast.Mod):
-            # Only support raw string format
-            raise click.ClickException(
-                "%s (%s): Unsupport modulo operation!"
-                % (os.path.basename(self._filename), node.lineno)
-            )
-
         lvalue = super().visit(node.left)
         opvalue = super().visit(node.op)
         rvalue = super().visit(node.right)
+
+        if isinstance(node.op, ast.Mod):
+            if lvalue.value_type == str:
+                # Only support raw string format
+                raise click.ClickException(
+                    "%s (%s): Unsupport modulo operation!"
+                    % (os.path.basename(self._filename), node.lineno)
+                )
+            else:
+                lvar = self._ctx.gen_var()
+                mvar = self._ctx.gen_var()  # Middle variable
+                rvar = self._ctx.gen_var()
+
+                self._ctx.prepend_line("%s = %s" % (lvar, lvalue))
+                self._ctx.prepend_line("%s = %s / %s" % (mvar, lvalue, rvalue))
+                self._ctx.prepend_line("%s = %s" % (rvar, rvalue))
+                return VisitResult("(%s - %s * %s)" % (lvar, mvar, rvar), node)
 
         return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue), node)
 
