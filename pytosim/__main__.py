@@ -302,6 +302,12 @@ class SimVisitor(ast.NodeVisitor):
         lvalue = super().visit(node.left)
         opvalue = super().visit(node.op)
         rvalue = super().visit(node.right)
+        result_value_type = None
+
+        if lvalue.value_type == float or rvalue.value_type == float:
+            result_value_type = float
+        elif lvalue.value_type == int or rvalue.value_type == int:
+            result_value_type = int
 
         if isinstance(node.op, ast.Mod):
             if lvalue.value_type == str:
@@ -318,9 +324,17 @@ class SimVisitor(ast.NodeVisitor):
                 self._ctx.prepend_line("%s = %s" % (lvar, lvalue))
                 self._ctx.prepend_line("%s = %s / %s" % (mvar, lvalue, rvalue))
                 self._ctx.prepend_line("%s = %s" % (rvar, rvalue))
-                return VisitResult("(%s - %s * %s)" % (lvar, mvar, rvar), node)
+                return VisitResult(
+                    "(%s - %s * %s)" % (lvar, mvar, rvar),
+                    node,
+                    result_value_type,
+                )
 
-        return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue), node)
+        return VisitResult(
+            "(%s %s %s)" % (lvalue, opvalue, rvalue),
+            node,
+            result_value_type,
+        )
 
     def visit_Add(self, node: ast.Add) -> VisitResult:
         return VisitResult("+", node)
