@@ -34,7 +34,7 @@ class VariableNotFoundError(VisitorError):
 
 
 class VisitResult(object):
-    def __init__(self, text: str, node, value_type=str):
+    def __init__(self, text: str, node, value_type=None):
         self.text = text
         self.node = node
         self.value_type = value_type
