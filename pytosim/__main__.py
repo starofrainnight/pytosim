@@ -374,6 +374,13 @@ class SimVisitor(ast.NodeVisitor):
 
         return VisitResult(str_quote("".join(result)), node)
 
+    def visit_Subscript(self, node: ast.Subscript) -> Any:
+        # a[x] # The subscript x of a
+        return VisitResult(
+            "%s[%s]" % (super().visit(node.value), super().visit(node.slice)),
+            node,
+        )
+
     def visit_Global(self, node: ast.Global) -> Any:
         for elem in node.names:
             self._ctx.append_line("global %s" % elem)
@@ -519,14 +526,11 @@ class SimVisitor(ast.NodeVisitor):
         arg_texts = []
         for arg in node.args:
             value = self.visit(arg)
-            print("value : %s" % value)
             if isinstance(value.node, ast.Constant) and (
                 value.value_type == str
             ):
-                print("value1 : %s" % value)
                 arg_texts.append('"%s"' % value)
             else:
-                print("value2 : %s" % value)
                 arg_texts.append(str(value))
 
         texts.append(", ".join(arg_texts))
