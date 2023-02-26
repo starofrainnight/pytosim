@@ -151,7 +151,13 @@ class SimVisitor(ast.NodeVisitor):
 
         self._ctx = SimContext()
         self._filename = filename
-        self._buildins = ["ord", "chr", "len", "min", "max"]
+        self._buildins = {
+            "ord": "CharFromAscii",
+            "chr": "AsciiFromChar",
+            "len": "strlen",
+            "min": "_pytosim_min",
+            "max": "_pytosim_max",
+        }
 
     def run(self, node: ast.AST, filename=None) -> Any:
         self._filename = filename
@@ -482,17 +488,7 @@ class SimVisitor(ast.NodeVisitor):
     def visit_BuildIns(self, node: ast.Call) -> Any:
         nchain = self._get_nchain_from_call(node)
         var_name = nchain[-1]
-        replaced_name = ""
-        if var_name == "chr":
-            replaced_name = "CharFromAscii"
-        elif var_name == "ord":
-            replaced_name = "AsciiFromChar"
-        elif var_name == "len":
-            replaced_name = "strlen"
-        elif var_name == "min":
-            replaced_name = "_pytosim_min"
-        elif var_name == "max":
-            replaced_name = "_pytosim_max"
+        replaced_name = self._buildins.get(var_name, "")
 
         return VisitResult(replaced_name, Any)
 
