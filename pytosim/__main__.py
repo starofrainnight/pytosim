@@ -581,7 +581,7 @@ class SimVisitor(ast.NodeVisitor):
             self._ctx.prepend_line(
                 "%s = %s" % (var_name, self.visit(node.orelse))
             )
-        return var_name
+        return VisitResult(var_name, node)
 
     def visit_While(self, node: ast.While) -> Any:
         var_name = self._ctx.gen_var()
