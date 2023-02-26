@@ -151,7 +151,7 @@ class SimVisitor(ast.NodeVisitor):
 
         self._ctx = SimContext()
         self._filename = filename
-        self._buildins = ["ord", "chr", "len"]
+        self._buildins = ["ord", "chr", "len", "min", "max"]
 
     def run(self, node: ast.AST, filename=None) -> Any:
         self._filename = filename
@@ -489,6 +489,10 @@ class SimVisitor(ast.NodeVisitor):
             replaced_name = "AsciiFromChar"
         elif var_name == "len":
             replaced_name = "strlen"
+        elif var_name == "min":
+            replaced_name = "_pytosim_min"
+        elif var_name == "max":
+            replaced_name = "_pytosim_max"
 
         return VisitResult(replaced_name, Any)
 
