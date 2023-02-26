@@ -312,22 +312,22 @@ class SimVisitor(ast.NodeVisitor):
 
         return VisitResult("(%s %s %s)" % (lvalue, opvalue, rvalue), node)
 
-    def visit_Add(self, node: ast.Add) -> str:
+    def visit_Add(self, node: ast.Add) -> VisitResult:
         return VisitResult("+", node)
 
-    def visit_Sub(self, node: ast.Sub) -> str:
+    def visit_Sub(self, node: ast.Sub) -> VisitResult:
         return VisitResult("-", node)
 
-    def visit_USub(self, node: ast.USub) -> str:
+    def visit_USub(self, node: ast.USub) -> VisitResult:
         return VisitResult("-", node)
 
-    def visit_Mult(self, node: ast.Mult) -> str:
+    def visit_Mult(self, node: ast.Mult) -> VisitResult:
         return VisitResult("*", node)
 
-    def visit_Div(self, node: ast.Div) -> str:
+    def visit_Div(self, node: ast.Div) -> VisitResult:
         return VisitResult("/", node)
 
-    def visit_Constant(self, node: ast.Constant) -> str:
+    def visit_Constant(self, node: ast.Constant) -> VisitResult:
         return VisitResult(
             ('"%s"' % node.value)
             if isinstance(node.value, str)
@@ -336,25 +336,25 @@ class SimVisitor(ast.NodeVisitor):
             type(node.value),
         )
 
-    def visit_Eq(self, node: ast.Eq) -> str:
+    def visit_Eq(self, node: ast.Eq) -> VisitResult:
         return VisitResult("==", node)
 
-    def visit_Gt(self, node: ast.Gt) -> str:
+    def visit_Gt(self, node: ast.Gt) -> VisitResult:
         return VisitResult(">", node)
 
-    def visit_GtE(self, node: ast.GtE) -> str:
+    def visit_GtE(self, node: ast.GtE) -> VisitResult:
         return VisitResult(">=", node)
 
-    def visit_Lt(self, node: ast.Lt) -> str:
+    def visit_Lt(self, node: ast.Lt) -> VisitResult:
         return VisitResult("<", node)
 
-    def visit_LtE(self, node: ast.LtE) -> str:
+    def visit_LtE(self, node: ast.LtE) -> VisitResult:
         return VisitResult("<=", node)
 
-    def visit_Attribute(self, node: ast.Attribute) -> str:
+    def visit_Attribute(self, node: ast.Attribute) -> VisitResult:
         return VisitResult(node.attr, node)
 
-    def visit_Compare(self, node: ast.Compare) -> str:
+    def visit_Compare(self, node: ast.Compare) -> VisitResult:
         return VisitResult(
             "%s %s %s"
             % (
