@@ -315,6 +315,12 @@ class SimVisitor(ast.NodeVisitor):
     def visit_Add(self, node: ast.Add) -> str:
         return VisitResult("+", node)
 
+    def visit_Sub(self, node: ast.Sub) -> str:
+        return VisitResult("-", node)
+
+    def visit_USub(self, node: ast.USub) -> str:
+        return VisitResult("-", node)
+
     def visit_Mult(self, node: ast.Mult) -> str:
         return VisitResult("*", node)
 
@@ -384,6 +390,12 @@ class SimVisitor(ast.NodeVisitor):
         # a[x] # The subscript x of a
         return VisitResult(
             "%s[%s]" % (super().visit(node.value), super().visit(node.slice)),
+            node,
+        )
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
+        return VisitResult(
+            "%s%s" % (super().visit(node.op), super().visit(node.operand)),
             node,
         )
 
