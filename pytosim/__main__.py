@@ -563,12 +563,7 @@ class SimVisitor(ast.NodeVisitor):
         arg_texts = []
         for arg in node.args:
             value = self.visit(arg)
-            if isinstance(value.node, ast.Constant) and (
-                value.value_type == str
-            ):
-                arg_texts.append('"%s"' % value)
-            else:
-                arg_texts.append(str(value))
+            arg_texts.append(str(value))
 
         texts.append(", ".join(arg_texts))
         texts.append(")")
