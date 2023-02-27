@@ -644,12 +644,6 @@ class SimVisitor(ast.NodeVisitor):
             self._ctx.append_line("}")
 
     def visit_For(self, node: ast.For) -> Any:
-        if node.orelse:
-            raise click.ClickException(
-                "%s (%s): Unsupported for loop with 'else' statement!"
-                % (os.path.basename(self._filename), node.lineno)
-            )
-
         if not (
             isinstance(node.iter, ast.Call) and node.iter.func.id == "range"
         ):
@@ -681,12 +675,21 @@ class SimVisitor(ast.NodeVisitor):
         self._ctx.append_line("while (%s < %s)" % (var_name, iter_stop))
         self._ctx.append_line("{")
         with self._ctx.open_block():
+            for elem in node.body:
+                self.visit(elem)
+
             self._ctx.append_line(
                 "%s = %s + (%s)" % (var_name, var_name, iter_step)
             )
-            for elem in node.body:
-                self.visit(elem)
         self._ctx.append_line("}")
+
+        if node.orelse:
+            self._ctx.append_line("if (%s >= %s)" % (var_name, iter_stop))
+            self._ctx.append_line("{")
+            with self._ctx.open_block():
+                for child in node.orelse:
+                    super().visit(child)
+            self._ctx.append_line("}")
 
 
 @click.group()
