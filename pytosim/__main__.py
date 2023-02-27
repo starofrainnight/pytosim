@@ -622,8 +622,7 @@ class SimVisitor(ast.NodeVisitor):
     def visit_While(self, node: ast.While) -> Any:
         var_name = self._ctx.gen_var()
 
-        self._ctx.append_line("%s = %s" % (var_name, self.visit(node.test)))
-        self._ctx.append_line("while (%s)" % var_name)
+        self._ctx.append_line("while (%s)" % self.visit(node.test))
         self._ctx.append_line("{")
         with self._ctx.open_block():
             for child in node.body:
