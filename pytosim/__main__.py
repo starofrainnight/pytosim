@@ -387,6 +387,7 @@ class SimVisitor(ast.NodeVisitor):
                 super().visit(node.comparators[0]),
             ),
             node,
+            bool,
         )
 
     def visit_FormattedValue(self, node: ast.FormattedValue) -> VisitResult:
