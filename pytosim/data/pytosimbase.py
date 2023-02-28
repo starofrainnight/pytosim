@@ -37,7 +37,11 @@ def _pytosim_mid(s: str, idx_from: int, idx_to: int) -> str:
         return ""
 
     idx_from = _pytosim_normalize_idx(s_len, idx_from)
-    idx_from = _pytosim_min(idx_from, s_len - 1)
+    if idx_from >= s_len:
+        return ""
+
     idx_to = _pytosim_normalize_idx(s_len, idx_to)
-    idx_to = _pytosim_max(idx_to, idx_from + 1)
+    if idx_to <= idx_from:
+        return ""
+
     return simstr.strmid(s, idx_from, idx_to)
