@@ -646,15 +646,15 @@ class SimVisitor(ast.NodeVisitor):
         self._ctx.append_line("{")
         with self._ctx.open_block():
             self._ctx.append_line(
-                "%s = %s" % (var_name, self.visit(node.test))
+                "%s = !(%s)" % (var_name, self.visit(node.test))
             )
-            self._ctx.append_line("if (!%s) break" % var_name)
+            self._ctx.append_line("if (%s) break" % var_name)
             for child in node.body:
                 super().visit(child)
         self._ctx.append_line("}")
 
         if node.orelse:
-            self._ctx.append_line("if (!%s)" % var_name)
+            self._ctx.append_line("if (%s)" % var_name)
             self._ctx.append_line("{")
             with self._ctx.open_block():
                 for child in node.orelse:
