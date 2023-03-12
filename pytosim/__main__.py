@@ -412,6 +412,26 @@ class SimVisitor(ast.NodeVisitor):
         return VisitResult(str_quote("".join(result)), node)
 
     def visit_Subscript(self, node: ast.Subscript) -> Any:
+        subscript_value = super().visit(node.value)
+
+        if isinstance(node.slice, ast.Slice):
+            slice_node = node.slice
+            if slice_node.lower:
+                lower_value = super().visit(slice_node.lower)
+            else:
+                lower_value = 0
+
+            if slice_node.upper:
+                upper_value = super().visit(slice_node.upper)
+            else:
+                upper_value = "strlen(%s)" % subscript_value
+
+            return VisitResult(
+                "_pytosim_mid(%s, %s, %s)"
+                % (subscript_value, lower_value, upper_value),
+                node,
+            )
+
         # a[x] # The subscript x of a
         return VisitResult(
             "%s[%s]" % (super().visit(node.value), super().visit(node.slice)),
