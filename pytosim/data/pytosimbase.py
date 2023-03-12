@@ -16,17 +16,17 @@ def _pytosim_max(a, b) -> float:
     return b
 
 
-def _pytosim_normalize_idx(len: int, idx: int) -> int:
+def _pytosim_normalize_idx(size: int, idx: int) -> int:
     """Normalize the index value"""
 
     if idx < 0:
-        if idx < -len:
-            idx = -len
+        if idx < -size:
+            idx = -size
 
-        idx = len + idx
-    elif idx > len:
+        idx = size + idx
+    elif idx > size:
         # idx use as stop index could after the array's end
-        idx = len
+        idx = size
 
     return idx
 
