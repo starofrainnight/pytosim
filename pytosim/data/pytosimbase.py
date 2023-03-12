@@ -45,3 +45,10 @@ def _pytosim_mid(s: str, idx_from: int, idx_to: int) -> str:
         return ""
 
     return simstr.strmid(s, idx_from, idx_to)
+
+
+def _pytosim_str_get(s: str, idx: int) -> str:
+    if idx < 0:
+        return s[len(s) - idx]
+
+    return s[idx]

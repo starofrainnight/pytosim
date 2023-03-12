@@ -433,10 +433,13 @@ class SimVisitor(ast.NodeVisitor):
             )
 
         # a[x] # The subscript x of a
-        return VisitResult(
-            "%s[%s]" % (super().visit(node.value), super().visit(node.slice)),
-            node,
-        )
+        lret = super().visit(node.value)
+        rret = super().visit(node.slice)
+        if isinstance(node.slice, ast.Constant):
+            if int(str(rret)) >= 0:
+                return VisitResult("%s[%s]" % (lret, rret), node)
+
+        return VisitResult("_pytosim_mid_get(%s, %s)" % (lret, rret), node)
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
         return VisitResult(
