@@ -2,7 +2,7 @@
 pytosim
 =======
 
-A compiler for convert Python source to Source Insight 3.5 Macro
+A transpiler that converts Python source to Source Insight 3.5 Macro
 
 You should notice that, it's just supports a subset python features, and will never supports them all.
 

@@ -430,6 +430,7 @@ class SimVisitor(ast.NodeVisitor):
                 "_pytosim_mid(%s, %s, %s)"
                 % (subscript_value, lower_value, upper_value),
                 node,
+                str,
             )
 
         # a[x] # The subscript x of a
@@ -437,9 +438,11 @@ class SimVisitor(ast.NodeVisitor):
         rret = super().visit(node.slice)
         if isinstance(node.slice, ast.Constant):
             if int(str(rret)) >= 0:
-                return VisitResult("%s[%s]" % (lret, rret), node)
+                return VisitResult("%s[%s]" % (lret, rret), node, str)
 
-        return VisitResult("_pytosim_mid_get(%s, %s)" % (lret, rret), node)
+        return VisitResult(
+            "_pytosim_mid_get(%s, %s)" % (lret, rret), node, str
+        )
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
         return VisitResult(
@@ -490,7 +493,7 @@ class SimVisitor(ast.NodeVisitor):
             self._ctx.pack_cur_line()
 
             scope = self._ctx.get_last_scope()
-            scope.vars.append(SimVariable(lname))
+            scope.vars.append(SimVariable(lname, rname.value_type))
         else:
             # Assume rop as Tuple
             self._ctx.pack_cur_line()
@@ -500,7 +503,7 @@ class SimVisitor(ast.NodeVisitor):
                 self._ctx.append_cur_line("%s = %s" % (lname, rname))
                 self._ctx.pack_cur_line()
                 scope = self._ctx.get_last_scope()
-                scope.vars.append(SimVariable(lname))
+                scope.vars.append(SimVariable(lname, rname.value_type))
 
     def visit_Module(self, node: ast.Module) -> Any:
         with self._ctx.open_block(SimBlock.SCOPE):
@@ -628,15 +631,13 @@ class SimVisitor(ast.NodeVisitor):
         var_name = self._ctx.gen_var()
         self._ctx.prepend_line("if (%s)" % self.visit(node.test))
         with self._ctx.open_block():
-            self._ctx.prepend_line(
-                "%s = %s" % (var_name, self.visit(node.body))
-            )
+            body_ret = self.visit(node.body)
+            self._ctx.prepend_line("%s = %s" % (var_name, body_ret))
         self._ctx.prepend_line("else")
         with self._ctx.open_block():
-            self._ctx.prepend_line(
-                "%s = %s" % (var_name, self.visit(node.orelse))
-            )
-        return VisitResult(var_name, node)
+            orelse_ret = self.visit(node.orelse)
+            self._ctx.prepend_line("%s = %s" % (var_name, orelse_ret))
+        return VisitResult(var_name, node, body_ret.value_type)
 
     def visit_While(self, node: ast.While) -> Any:
         var_name = self._ctx.gen_var()
@@ -732,7 +733,7 @@ def compile_base():
 @main.command()
 @click.argument("pyscript")
 def compile(pyscript):
-    """A compiler for convert Python source to Source Insight 3.5 Macro"""
+    """A transpiler for convert Python source to Source Insight 3.5 Macro"""
     out_path = Path(pyscript).with_suffix(".em")
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
