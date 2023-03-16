@@ -409,7 +409,7 @@ class SimVisitor(ast.NodeVisitor):
                 value = value.replace("@", r"\@")
                 result.append(value)
 
-        return VisitResult(str_quote("".join(result)), node)
+        return VisitResult(str_quote("".join(result)), node, str)
 
     def visit_Subscript(self, node: ast.Subscript) -> Any:
         subscript_value = super().visit(node.value)
