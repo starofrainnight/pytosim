@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import ast
 import os
+import sys
 import os.path
 import click
 import weakref
@@ -159,12 +160,18 @@ class SimVisitor(ast.NodeVisitor):
             "max": "_pytosim_max",
         }
 
-    def run(self, node: ast.AST, filename=None) -> Any:
-        self._filename = filename
+    def run(self, node: ast.AST, src_fname=None, out_fname=None) -> Any:
+        self._filename = src_fname
         self.visit(node)
 
+        if out_fname:
+            out_file = open(out_fname, "w")
+        else:
+            out_file = sys.stdout
+
         for line in self._ctx._src_lines:
-            print(line)
+            out_file.write(line)
+            out_file.write("\n")
 
     def get_name_chain(self, node) -> List[str]:
         names = list()
@@ -716,29 +723,34 @@ def main():
     pass
 
 
-@main.command()
+@click.command()
 def compile_base():
     """Generate the pytosim base macro file"""
 
     pyscript = os.path.join(
         os.path.dirname(__file__), "data", "pytosimbase.py"
     )
-    out_path = Path(pyscript).with_suffix(".em")
+    out_fname = Path(Path(pyscript).name).with_suffix(".em")
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
     visitor = SimVisitor(pyscript)
-    visitor.run(root, pyscript)
+    visitor.run(root, pyscript, out_fname)
 
 
 @main.command()
+@click.pass_context
+@click.option("--gen-base", is_flag=True, default=False)
 @click.argument("pyscript")
-def compile(pyscript):
+def compile(ctx, gen_base, pyscript):
     """A transpiler for convert Python source to Source Insight 3.5 Macro"""
-    out_path = Path(pyscript).with_suffix(".em")
+    if gen_base:
+        ctx.invoke(compile_base)
+
+    out_fname = Path(pyscript).with_suffix(".em")
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
     visitor = SimVisitor(pyscript)
-    visitor.run(root, pyscript)
+    visitor.run(root, pyscript, out_fname)
 
 
 if __name__ == "__main__":
