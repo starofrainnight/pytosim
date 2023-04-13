@@ -740,13 +740,18 @@ def compile_base():
 @main.command()
 @click.pass_context
 @click.option("--gen-base", is_flag=True, default=False)
+@click.option("-o", "--output")
 @click.argument("pyscript")
-def compile(ctx, gen_base, pyscript):
+def compile(ctx, gen_base, output, pyscript):
     """A transpiler for convert Python source to Source Insight 3.5 Macro"""
     if gen_base:
         ctx.invoke(compile_base)
 
-    out_fname = Path(pyscript).with_suffix(".em")
+    if output:
+        out_fname = output
+    else:
+        out_fname = Path(pyscript).with_suffix(".em")
+
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
     visitor = SimVisitor(pyscript)
