@@ -723,7 +723,7 @@ def main():
     pass
 
 
-@click.command()
+@main.command()
 def compile_base():
     """Generate the pytosim base macro file"""
 
