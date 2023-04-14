@@ -282,7 +282,11 @@ class SimVisitor(ast.NodeVisitor):
     def generic_visit(self, node: ast.AST) -> Any:
         raise click.ClickException(
             "%s (%s): Unsupported python element: %s!"
-            % (os.path.basename(self._filename), node.lineno, node)
+            % (
+                os.path.basename(self._filename),
+                getattr(node, "lineno", -1),
+                node,
+            )
         )
 
     def visit_arguments(self, node: ast.arguments) -> VisitResult:
