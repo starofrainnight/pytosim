@@ -242,9 +242,13 @@ class SimVisitor(ast.NodeVisitor):
         self, node: ast.ImportFrom, nchain: List[str]
     ):
         for analias in node.names:
-            if nchain[0] in [analias.asname or analias.name]:
+            if nchain[0] in [analias.asname, analias.name]:
+                alias_name = analias.name
+                if analias.asname:
+                    alias_name = analias.asname
+
                 return SimNChain(
-                    nchain, node.module.split("."), [analias.name]
+                    nchain, node.module.split("."), [alias_name, *nchain[1:]]
                 )
 
         raise NameError("name '%s' is not defined" % nchain[0])
