@@ -363,13 +363,18 @@ class SimVisitor(ast.NodeVisitor):
         return VisitResult("/", node)
 
     def visit_Constant(self, node: ast.Constant) -> VisitResult:
-        return VisitResult(
-            ('"%s"' % node.value)
-            if isinstance(node.value, str)
-            else str(node.value),
-            node,
-            type(node.value),
-        )
+        text = ""
+
+        if isinstance(node.value, str):
+            text = '"%s"' % node.value
+        elif isinstance(node.value, bool):
+            text = "1" if node.value else "0"
+        elif node.value is None:
+            text = "Nil"
+        else:
+            text = str(node.value)
+
+        return VisitResult(text, node, type(node.value))
 
     def visit_Eq(self, node: ast.Eq) -> VisitResult:
         return VisitResult("==", node)
