@@ -225,7 +225,7 @@ class SimVisitor(ast.NodeVisitor):
 
             # No alias
             module_nchain = analias.name.split(".")
-            if len(module_nchain) < len(nchain):
+            if len(module_nchain) >= len(nchain):
                 continue
 
             matched_nchain = nchain[: len(module_nchain)]
