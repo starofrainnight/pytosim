@@ -386,6 +386,9 @@ class SimVisitor(ast.NodeVisitor):
     def visit_LtE(self, node: ast.LtE) -> VisitResult:
         return VisitResult("<=", node)
 
+    def visit_NotEq(self, node: ast.NotEq) -> VisitResult:
+        return VisitResult("!=", node)
+
     def visit_Attribute(self, node: ast.Attribute) -> VisitResult:
         return VisitResult(node.attr, node)
 
