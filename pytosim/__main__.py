@@ -754,17 +754,18 @@ def main():
 
 
 @main.command()
-def compile_base():
+@click.option("-o", "--output-dir", default=os.curdir)
+def compile_base(output_dir):
     """Generate the pytosim base macro file"""
 
     pyscript = os.path.join(
         os.path.dirname(__file__), "data", "pytosimbase.py"
     )
-    out_fname = Path(Path(pyscript).name).with_suffix(".em")
+    out_fname = Path(pyscript).with_suffix(".em").name
     with open(pyscript, "r") as f:
         root = ast.parse(f.read(), filename=pyscript)
     visitor = SimVisitor(pyscript)
-    visitor.run(root, pyscript, out_fname)
+    visitor.run(root, pyscript, os.path.join(output_dir, out_fname))
 
 
 @main.command()
