@@ -512,6 +512,29 @@ class SimVisitor(ast.NodeVisitor):
                 scope = self._ctx.get_last_scope()
                 scope.vars.append(SimVariable(lname, rname.value_type))
 
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> Any:
+        """Annotation Assign
+
+        For ex:
+
+            a: str = "12"
+
+        """
+
+        lop = node.target
+        rop = node.value
+
+        self._ctx.pack_cur_line()
+        lname = super().visit(lop)
+        rname = super().visit(rop)
+        self._ctx.append_cur_line("%s = %s" % (lname, rname))
+        self._ctx.pack_cur_line()
+
+        scope = self._ctx.get_last_scope()
+
+        ann_type = self.visit_Name(node.annotation).value_type
+        scope.vars.append(SimVariable(lname, ann_type))
+
     def visit_Module(self, node: ast.Module) -> Any:
         with self._ctx.open_block(SimBlock.SCOPE):
             super().generic_visit(node)
