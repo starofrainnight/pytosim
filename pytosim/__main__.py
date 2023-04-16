@@ -459,9 +459,7 @@ class SimVisitor(ast.NodeVisitor):
             if int(str(rret)) >= 0:
                 return VisitResult("%s[%s]" % (lret, rret), node, str)
 
-        return VisitResult(
-            "_pytosim_str_get(%s, %s)" % (lret, rret), node, str
-        )
+        return VisitResult("_pytosim_get(%s, %s)" % (lret, rret), node, str)
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
         opresult = super().visit(node.operand)  # type: VisitResult
