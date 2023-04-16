@@ -197,7 +197,7 @@ class SimVisitor(ast.NodeVisitor):
 
         raise VariableNotFoundError(name)
 
-    def _get_nchain_from_call(self, node: ast.Call):
+    def _get_nchain_from_call(self, node: ast.Call) -> List[str]:
         nchain = []
         node = node.func
         while node:
@@ -243,12 +243,8 @@ class SimVisitor(ast.NodeVisitor):
     ):
         for analias in node.names:
             if nchain[0] in [analias.asname, analias.name]:
-                alias_name = analias.name
-                if analias.asname:
-                    alias_name = analias.asname
-
                 return SimNChain(
-                    nchain, node.module.split("."), [alias_name, *nchain[1:]]
+                    nchain, node.module.split("."), [analias.name, *nchain[1:]]
                 )
 
         raise NameError("name '%s' is not defined" % nchain[0])
@@ -464,7 +460,7 @@ class SimVisitor(ast.NodeVisitor):
                 return VisitResult("%s[%s]" % (lret, rret), node, str)
 
         return VisitResult(
-            "_pytosim_mid_get(%s, %s)" % (lret, rret), node, str
+            "_pytosim_str_get(%s, %s)" % (lret, rret), node, str
         )
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
@@ -622,6 +618,17 @@ class SimVisitor(ast.NodeVisitor):
         if is_buildin:
             mapped_func_name = self.visit_BuildIns(node).text
         else:
+            # Support internal "get" method
+            cmds_api_nchain = ["pytosim", "api", "string", "_get"]
+            if cmds_api_nchain == nchain.resolve():
+                lret = self.visit(node.args[0])
+                rret = self.visit(node.args[1])
+                return VisitResult(
+                    "%s[%s]" % (str(lret), str(rret)),
+                    node,
+                    value_type=lret.value_type,
+                )
+
             # Support special pytosim.api.cmds convertion
             cmds_api_nchain = ["pytosim", "api", "cmds"]
             if (len(nchain.module) >= len(cmds_api_nchain)) and (

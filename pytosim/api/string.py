@@ -43,3 +43,8 @@ def tolower(s: str) -> str:
 
 def toupper(s: str) -> str:
     return s.upper()
+
+
+def _get(s: str, idx: int) -> str:
+    """A fake method to expand as "s[idx]" text"""
+    return s[idx]
