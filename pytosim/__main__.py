@@ -468,9 +468,12 @@ class SimVisitor(ast.NodeVisitor):
         )
 
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
+        opresult = super().visit(node.operand)  # type: VisitResult
+
         return VisitResult(
-            "%s%s" % (super().visit(node.op), super().visit(node.operand)),
+            "%s%s" % (super().visit(node.op), str(opresult)),
             node,
+            opresult.value_type,
         )
 
     def visit_Global(self, node: ast.Global) -> Any:
@@ -634,8 +637,17 @@ class SimVisitor(ast.NodeVisitor):
 
         arg_texts = []
         for arg in node.args:
-            value = self.visit(arg)
-            arg_texts.append(str(value))
+            value = self.visit(arg)  # type: VisitResult
+
+            # All constants pass to source insight macro must be string!
+            if (
+                (value.value_type == int)
+                or (value.value_type == float)
+                or (value.value_type == bool)
+            ):
+                arg_texts.append(str_quote(str(value)))
+            else:
+                arg_texts.append(str(value))
 
         texts.append(", ".join(arg_texts))
         texts.append(")")
