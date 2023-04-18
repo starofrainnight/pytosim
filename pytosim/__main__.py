@@ -244,7 +244,9 @@ class SimVisitor(ast.NodeVisitor):
         for analias in node.names:
             if nchain[0] in [analias.asname, analias.name]:
                 return SimNChain(
-                    nchain, node.module.split("."), [analias.name, *nchain[1:]]
+                    nchain,
+                    list() if node.module is None else node.module.split("."),
+                    [analias.name, *nchain[1:]],
                 )
 
         raise NameError("name '%s' is not defined" % nchain[0])
