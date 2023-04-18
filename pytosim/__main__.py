@@ -756,7 +756,7 @@ class SimVisitor(ast.NodeVisitor):
             )
 
         self._ctx.append_line("%s = %s" % (var_name, iter_start))
-        self._ctx.append_line("while (%s < %s)" % (var_name, iter_stop))
+        self._ctx.append_line("while (%s != %s)" % (var_name, iter_stop))
         self._ctx.append_line("{")
         with self._ctx.open_block():
             for elem in node.body:
