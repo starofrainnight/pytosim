@@ -566,6 +566,20 @@ class SimVisitor(ast.NodeVisitor):
 
         with self._ctx.open_block(SimBlock.SCOPE):
             for stmt in node.body:
+                if (
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                ):
+                    # The comment about this function
+                    #
+                    # def the_func():
+                    #     """The constant text"""
+                    #     pass
+
+                    # We just ignore them
+                    continue
+
                 self.visit(stmt)
 
         self._ctx.append_cur_line("}")
