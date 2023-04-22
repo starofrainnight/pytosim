@@ -47,6 +47,10 @@ def GetSymbolLine(symbol_name: str) -> int:
 
 
 def GetSymbolLocation(symbol_name: str) -> Symbol:
+    """Get the symbol location (Seems not working now)
+
+    Try GetSymbolLocationEx()
+    """
     pass
 
 
@@ -57,6 +61,11 @@ def GetSymbolLocationEx(
     fLocateFiles: bool,
     fLocateSymbols: bool,
 ) -> Symbol:
+    """Get the symbol location
+
+    'symbol_name': If we want to find a file, you sould give it's name with
+    extension!
+    """
     pass
 
 
