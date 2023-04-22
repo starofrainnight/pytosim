@@ -356,6 +356,12 @@ class SimVisitor(ast.NodeVisitor):
         return VisitResult("-", node)
 
     def visit_USub(self, node: ast.USub) -> VisitResult:
+        """Subtract op on sth.
+
+        a = -1 # <- value like this
+        a = -funcCall()
+        """
+
         return VisitResult("-", node)
 
     def visit_Mult(self, node: ast.Mult) -> VisitResult:
