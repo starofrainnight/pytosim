@@ -472,11 +472,32 @@ class SimVisitor(ast.NodeVisitor):
     def visit_UnaryOp(self, node: ast.UnaryOp) -> Any:
         opresult = super().visit(node.operand)  # type: VisitResult
 
-        return VisitResult(
-            "%s%s" % (super().visit(node.op), str(opresult)),
-            node,
-            opresult.value_type,
-        )
+        if isinstance(node.op, ast.USub) and isinstance(
+            node.operand, ast.Call
+        ):
+            # Source Insight does not support codes as below:
+            #
+            # macro AFunc(path)
+            # {
+            #     return _pytosim_mid(path, -strlen(AnotherFunc(path)), strlen(path))
+            # }
+            #
+            # The substract operator will lead source insight reports error
+            var_name = self._ctx.gen_var()
+            self._ctx.prepend_line(
+                "%s = %s%s" % (var_name, super().visit(node.op), str(opresult))
+            )
+            return VisitResult(
+                var_name,
+                node,
+                opresult.value_type,
+            )
+        else:
+            return VisitResult(
+                "%s%s" % (super().visit(node.op), str(opresult)),
+                node,
+                opresult.value_type,
+            )
 
     def visit_Global(self, node: ast.Global) -> Any:
         for elem in node.names:
