@@ -403,7 +403,11 @@ class SimVisitor(ast.NodeVisitor):
         return VisitResult("!=", node)
 
     def visit_Attribute(self, node: ast.Attribute) -> VisitResult:
-        return VisitResult(node.attr, node)
+        """Visit the attribute:
+
+        var = loc.file # 'loc.file' is the attribute
+        """
+        return VisitResult(".".join(self.get_name_chain(node)), node)
 
     def visit_Compare(self, node: ast.Compare) -> VisitResult:
         return VisitResult(
