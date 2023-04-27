@@ -349,6 +349,19 @@ class SimVisitor(ast.NodeVisitor):
             result_value_type,
         )
 
+    def visit_BoolOp(self, node: ast.BoolOp) -> VisitResult:
+        # Ex:
+        #
+        # if (a == 3) or (b == 4):
+        #     pass
+        #
+
+        condition = ") || (".join(
+            map(lambda it: str(self.visit(it)), node.values)
+        )
+
+        return VisitResult("(%s)" % condition, node, bool)
+
     def visit_Add(self, node: ast.Add) -> VisitResult:
         return VisitResult("+", node)
 
