@@ -358,11 +358,32 @@ class SimVisitor(ast.NodeVisitor):
 
         join_op = ") %s (" % (self.visit(node.op),)
 
-        condition = join_op.join(
-            map(lambda it: str(self.visit(it)), node.values),
-        )
+        var = self._ctx.gen_var()
+        acomp = node.values[0]
+        self._ctx.prepend_line("%s = (%s)" % (var, str(self.visit(acomp))))
+        self._ctx.prepend_line("while True")
+        self._ctx.prepend_line("{")
+        if isinstance(node.op, ast.And):
+            for i in range(1, len(node.values)):
+                acomp = node.values[i]
+                self._ctx.prepend_line(
+                    "if(%s) { %s = (%s) } else { break }"
+                    % (var, var, str(self.visit(acomp)))
+                )
+        elif isinstance(node.op, ast.Or):
+            for i in range(1, len(node.values)):
+                acomp = node.values[i]
+                self._ctx.prepend_line(
+                    "if(%s) { break } else { %s = (%s) }"
+                    % (var, var, str(self.visit(acomp)))
+                )
+        else:
+            raise VisitorError("Unknown BoolOp", self._filename, node)
 
-        return VisitResult("(%s)" % condition, node, bool)
+        self._ctx.prepend_line("break")
+        self._ctx.prepend_line("}")
+
+        return VisitResult("%s" % var, node, bool)
 
     def visit_Add(self, node: ast.Add) -> VisitResult:
         return VisitResult("+", node)
