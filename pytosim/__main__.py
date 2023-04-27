@@ -356,8 +356,10 @@ class SimVisitor(ast.NodeVisitor):
         #     pass
         #
 
-        condition = ") || (".join(
-            map(lambda it: str(self.visit(it)), node.values)
+        join_op = ") %s (" % (self.visit(node.op),)
+
+        condition = join_op.join(
+            map(lambda it: str(self.visit(it)), node.values),
         )
 
         return VisitResult("(%s)" % condition, node, bool)
@@ -382,6 +384,12 @@ class SimVisitor(ast.NodeVisitor):
 
     def visit_Div(self, node: ast.Div) -> VisitResult:
         return VisitResult("/", node)
+
+    def visit_And(self, node: ast.And) -> VisitResult:
+        return VisitResult("&&", node)
+
+    def visit_Or(self, node: ast.Or) -> VisitResult:
+        return VisitResult("||", node)
 
     def visit_Constant(self, node: ast.Constant) -> VisitResult:
         text = ""
