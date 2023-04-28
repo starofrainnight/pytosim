@@ -842,16 +842,24 @@ class SimVisitor(ast.NodeVisitor):
                 % (os.path.basename(self._filename), node.lineno)
             )
 
-        self._ctx.append_line("%s = %s" % (var_name, iter_start))
-        self._ctx.append_line("while (%s != %s)" % (var_name, iter_stop))
+        self._ctx.append_line(
+            "%s = %s - (%s)" % (var_name, iter_start, iter_step)
+        )
+        self._ctx.append_line("while (1)")
         self._ctx.append_line("{")
+        self._ctx.append_line(
+            "%s%s = %s + (%s)"
+            % (self._ctx._indent_symbol, var_name, var_name, iter_step)
+        )
+        self._ctx.append_line(
+            "%sif(%s != %s) { break }"
+            % (self._ctx._indent_symbol, var_name, iter_stop)
+        )
+
         with self._ctx.open_block():
             for elem in node.body:
                 self.visit(elem)
 
-            self._ctx.append_line(
-                "%s = %s + (%s)" % (var_name, var_name, iter_step)
-            )
         self._ctx.append_line("}")
 
         if node.orelse:
