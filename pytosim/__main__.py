@@ -862,7 +862,7 @@ class SimVisitor(ast.NodeVisitor):
             % (self._ctx._indent_symbol, var_name, var_name, iter_step)
         )
         self._ctx.append_line(
-            "%sif(%s != %s) { break }"
+            "%sif(%s == %s) { break }"
             % (self._ctx._indent_symbol, var_name, iter_stop)
         )
 
