@@ -602,9 +602,29 @@ class SimVisitor(ast.NodeVisitor):
         else:
             # Assume rop as Tuple
             self._ctx.pack_cur_line()
-            for name_node, value_node in zip(lop.elts, rop.elts):
-                lname = super().visit(name_node)
-                rname = super().visit(value_node)
+            if hasattr(lop, "elts") and hasattr(rop, "elts"):
+                for name_node, value_node in zip(lop.elts, rop.elts):
+                    lname = super().visit(name_node)
+                    rname = super().visit(value_node)
+                    self._ctx.append_cur_line("%s = %s" % (lname, rname))
+                    self._ctx.pack_cur_line()
+                    scope = self._ctx.get_last_scope()
+                    scope.vars.append(SimVariable(lname, rname.value_type))
+            elif hasattr(lop, "elts"):
+                rname = super().visit(rop)
+                i = -1
+                for name_node in lop.elts:
+                    i += 1
+                    lname = super().visit(name_node)
+                    self._ctx.append_cur_line(
+                        "%s = %s[%s]" % (lname, rname, i)
+                    )
+                    self._ctx.pack_cur_line()
+                    scope = self._ctx.get_last_scope()
+                    scope.vars.append(SimVariable(lname, rname.value_type))
+            else:
+                rname = super().visit(rop)
+                lname = super().visit(lop)
                 self._ctx.append_cur_line("%s = %s" % (lname, rname))
                 self._ctx.pack_cur_line()
                 scope = self._ctx.get_last_scope()
