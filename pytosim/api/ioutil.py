@@ -64,4 +64,13 @@ def Msg(s: str):
 
 
 def StartMsg(s: str):
+    """Display a message window showing the string s. The message box has a
+    Cancel button that the user can click to stop the macro. The message
+    window stays up after returning.
+
+    NOTE: It have a special side effect: If you want to execute a long time
+    script, StartMsg() will ignore the gui events which slow down the script!
+    So, if you think the script not works as expect then just wrap it by a
+    StartMsg() & EndMsg() pair!
+    """
     pass
