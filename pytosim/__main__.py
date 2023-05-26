@@ -233,7 +233,7 @@ class SimVisitor(ast.NodeVisitor):
                 continue
 
             return SimNChain(
-                nchain, module_nchain, nchain[len(module_nchain) - 1 :]
+                nchain, module_nchain, nchain[len(module_nchain) :]
             )
 
         raise NameError("name '%s' is not defined" % nchain[0])
