@@ -426,7 +426,9 @@ class SimVisitor(ast.NodeVisitor):
         text = ""
 
         if isinstance(node.value, str):
-            text = '"%s"' % node.value.replace("\\", "\\\\")
+            text = '"%s"' % node.value.replace("\\", "\\\\").replace(
+                '"', '\\"'
+            ).replace("@", "@@")
         elif isinstance(node.value, bool):
             text = "1" if node.value else "0"
         elif node.value is None:
