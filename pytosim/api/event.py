@@ -1,53 +1,89 @@
 # -*- coding: utf-8 -*-
 
+# Decorators for events
 
-def AppStart():
-    pass
+from functools import wraps
 
-
-def AppShutdown():
-    pass
-
-
-def AppCommand(sCommand):
-    pass
+def AppStart(f):
+    return f
 
 
-def DocumentNew(sFile):
-    pass
+def AppShutdown(f):
+    return f
 
 
-def DocumentOpen(sFile):
-    pass
+def AppCommand(f):
+    @wraps(f)
+    def decorated(sCommand):
+        return f(sCommand)
+    return decorated
 
 
-def DocumentClose(sFile):
-    pass
+def DocumentNew(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def DocumentSave(sFile):
-    pass
+def DocumentOpen(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def DocumentSaveComplete(sFile):
-    pass
+def DocumentClose(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def DocumentChanged(sFile):
-    pass
+def DocumentSave(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def DocumentSelectionChanged(sFile):
-    pass
+def DocumentSaveComplete(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def ProjectOpen(sProject):
-    pass
+def DocumentChanged(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def ProjectClose(sProject):
-    pass
+def DocumentSelectionChanged(f):
+    @wraps(f)
+    def decorated(sFile):
+        return f(sFile)
+    return decorated
 
 
-def StatusbarUpdate(sMessage):
-    pass
+def ProjectOpen(f):
+    @wraps(f)
+    def decorated(sProject):
+        return f(sProject)
+    return decorated
+
+
+def ProjectClose(f):
+    @wraps(f)
+    def decorated(sProject):
+        return f(sProject)
+    return decorated
+
+
+def StatusbarUpdate(f):
+    @wraps(f)
+    def decorated(sMessage):
+        return f(sMessage)
+    return decorated

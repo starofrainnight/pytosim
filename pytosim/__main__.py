@@ -196,7 +196,36 @@ class SimVisitor(ast.NodeVisitor):
                     return avar
 
         raise VariableNotFoundError(name)
+    
+    def _resolve_next_from_any(self, value) -> Any:
+        """
+        Resolve the next node from value.
 
+        Returns (Current Value, Next Node), if no next node, the next node value
+        will be returns as None.
+        """
+        if isinstance(value, ast.Name):
+            value: ast.Name
+
+            return (value.id, None)
+
+        elif isinstance(value, ast.Attribute):
+            value: ast.Attribute
+
+            return (value.attr, value.value)
+        
+        return (None, None)
+    
+    def _resolve_nchain_from_any(self, value) -> List[str]:
+        ret = list() 
+
+        while value is not None:
+            name, value = self._resolve_next_from_any(value)
+            if name is not None:
+                ret.append(name)
+
+        return ret
+        
     def _get_nchain_from_call(self, node: ast.Call) -> List[str]:
         nchain = []
         node = node.func
@@ -662,8 +691,16 @@ class SimVisitor(ast.NodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
         self._ctx.pack_cur_line()
 
+        func_prefix = "macro"
+        func_name = node.name
+        for decorator in node.decorator_list:
+            nchain = self._resolve_nchain_from_any(decorator)
+            if len(nchain) == 2 and nchain[-1] == 'event':
+                func_prefix = "event"
+                func_name = nchain[0]        
+
         # Parse function declaration with arguments
-        self._ctx.append_cur_line("macro %s" % node.name)
+        self._ctx.append_cur_line("%s %s" % (func_prefix,func_name))
         self._ctx.append_cur_line("(%s)" % self.visit(node.args))
         self._ctx.pack_cur_line()
         self._ctx.append_cur_line("{")
