@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from typing import Any
+from typing import Any, Union
 from .types import HBuffer, ProgEnvInfo, ProgInfo
 
 
@@ -25,7 +25,7 @@ def RunCmd(cmd_name: str):
     pass
 
 
-def RunCmdLine(sCmdLine: str, sWorkingDirectory: str, fWait: bool) -> int:
+def RunCmdLine(sCmdLine: str, sWorkingDirectory: Union[str, None], fWait: bool) -> int:
     pass
 
 
